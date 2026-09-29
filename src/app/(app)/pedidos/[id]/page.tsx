@@ -1,5 +1,5 @@
 import { SubmitButton } from "@/components/submit-button";
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { notFound } from "next/navigation";
 import {
   Badge,
@@ -94,7 +94,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
         back="/pedidos"
         actions={
           <>
-            <Link prefetch={false} href={`/pedidos/${order.id}/editar`} className={btnPrimary}>
+            <Link href={`/pedidos/${order.id}/editar`} className={btnPrimary}>
               Editar pedido
             </Link>
             {isAdmin && (
@@ -358,7 +358,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
       <Card
         title={`Itens (${order.items.length})`}
         actions={
-          <Link prefetch={false} href={`/pedidos/${order.id}/editar`} className={btnSmall}>
+          <Link href={`/pedidos/${order.id}/editar`} className={btnSmall}>
             Editar itens
           </Link>
         }
@@ -488,7 +488,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
       <Card
         title="Recebimento"
         actions={
-          <Link prefetch={false} href={`/pedidos/${order.id}/conferencia`} className={btnPrimary}>
+          <Link href={`/pedidos/${order.id}/conferencia`} className={btnPrimary}>
             Conferir recebimento
           </Link>
         }

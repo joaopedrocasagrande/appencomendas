@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { ENTITIES } from "./config";
@@ -18,8 +18,7 @@ export default async function CadastrosPage() {
       <PageHeader title="Cadastros" />
       <div className="grid gap-3 sm:grid-cols-2">
         {links.map((l) => (
-          <Link prefetch={false}
-            key={l.href}
+          <Link key={l.href}
             href={l.href}
             className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-blue-300"
           >
