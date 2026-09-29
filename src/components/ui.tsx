@@ -94,7 +94,7 @@ export function PageHeader({
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2">
         {back && (
-          <Link href={back} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100" aria-label="Voltar">
+          <Link prefetch={false} href={back} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100" aria-label="Voltar">
             ←
           </Link>
         )}

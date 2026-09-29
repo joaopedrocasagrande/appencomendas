@@ -45,7 +45,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
             >
               ⬇ Excel
             </a>
-            <Link href="/pedidos/novo" className={btnPrimary}>
+            <Link prefetch={false} href="/pedidos/novo" className={btnPrimary}>
               + Novo pedido
             </Link>
           </>
@@ -125,7 +125,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
           <div className="flex items-end gap-2 sm:col-span-2">
             <button className={btnPrimary}>Filtrar</button>
             {hasFilters && (
-              <Link href="/pedidos" className={btnSecondary}>
+              <Link prefetch={false} href="/pedidos" className={btnSecondary}>
                 Limpar
               </Link>
             )}
@@ -162,7 +162,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
         <ul className="space-y-2">
           {list.map(({ o, t, late, r }) => (
             <li key={o.id}>
-              <Link
+              <Link prefetch={false}
                 href={`/pedidos/${o.id}`}
                 className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-blue-300"
               >

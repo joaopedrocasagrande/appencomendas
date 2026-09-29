@@ -94,7 +94,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
         back="/pedidos"
         actions={
           <>
-            <Link href={`/pedidos/${order.id}/editar`} className={btnPrimary}>
+            <Link prefetch={false} href={`/pedidos/${order.id}/editar`} className={btnPrimary}>
               Editar pedido
             </Link>
             {isAdmin && (
@@ -358,7 +358,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
       <Card
         title={`Itens (${order.items.length})`}
         actions={
-          <Link href={`/pedidos/${order.id}/editar`} className={btnSmall}>
+          <Link prefetch={false} href={`/pedidos/${order.id}/editar`} className={btnSmall}>
             Editar itens
           </Link>
         }
@@ -488,7 +488,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
       <Card
         title="Recebimento"
         actions={
-          <Link href={`/pedidos/${order.id}/conferencia`} className={btnPrimary}>
+          <Link prefetch={false} href={`/pedidos/${order.id}/conferencia`} className={btnPrimary}>
             Conferir recebimento
           </Link>
         }

@@ -8,6 +8,7 @@ export default async function CadastrosPage() {
   const links = [
     ...Object.entries(ENTITIES).map(([slug, c]) => ({ href: `/cadastros/${slug}`, title: c.title, desc: c.description })),
     { href: "/cotacoes", title: "Cotação do dólar", desc: "Valor do dólar que você define a cada dia." },
+    { href: "/diagnostico", title: "Diagnóstico", desc: "Velocidade da conexão do app com o banco." },
     ...(user.role === "admin"
       ? [{ href: "/cadastros/usuarios", title: "Usuários", desc: "Acesso de funcionários ao app." }]
       : []),
@@ -17,7 +18,7 @@ export default async function CadastrosPage() {
       <PageHeader title="Cadastros" />
       <div className="grid gap-3 sm:grid-cols-2">
         {links.map((l) => (
-          <Link
+          <Link prefetch={false}
             key={l.href}
             href={l.href}
             className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-blue-300"

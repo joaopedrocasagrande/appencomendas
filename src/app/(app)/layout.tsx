@@ -9,8 +9,7 @@ import { DesktopNav, MobileNav } from "./nav";
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
-  const user = await requireUser();
-  const rate = await getRateFor();
+  const [user, rate] = await Promise.all([requireUser(), getRateFor()]);
   const isToday = rate?.day === todayISO();
 
   return (
@@ -18,13 +17,13 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2">
           <div className="flex items-center gap-4">
-            <Link href="/painel" className="text-lg font-bold text-blue-700">
+            <Link prefetch={false} href="/painel" className="text-lg font-bold text-blue-700">
               Encomendas
             </Link>
             <DesktopNav />
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <Link
+            <Link prefetch={false}
               href="/cotacoes"
               className={
                 isToday
