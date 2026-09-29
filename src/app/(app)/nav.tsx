@@ -22,7 +22,7 @@ export function DesktopNav() {
   return (
     <nav className="hidden gap-1 md:flex">
       {LINKS.map((l) => (
-        <Link
+        <Link prefetch={false}
           key={l.href}
           href={l.href}
           className={cx(
@@ -42,7 +42,7 @@ export function MobileNav() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
       {LINKS.map((l) => (
-        <Link
+        <Link prefetch={false}
           key={l.href}
           href={l.href}
           className={cx(
