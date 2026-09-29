@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { desc } from "drizzle-orm";
 import { db } from "@/db";
 import { exchangeRates } from "@/db/schema";
@@ -36,7 +37,9 @@ export default async function RatesPage() {
                   {user.role === "admin" && (
                     <form action={deleteRate}>
                       <input type="hidden" name="day" value={r.day} />
-                      <button className={btnSmall}>Excluir</button>
+                      <SubmitButton className={btnSmall} pendingText="...">
+                        Excluir
+                      </SubmitButton>
                     </form>
                   )}
                 </span>

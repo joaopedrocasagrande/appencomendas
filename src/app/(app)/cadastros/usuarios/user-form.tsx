@@ -82,7 +82,7 @@ export function UserRowItem({ user }: { user: UserRow }) {
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
         <div className="flex gap-2">
           <button className={btnPrimary} disabled={pending}>
-            Salvar
+            {pending ? "Salvando..." : "Salvar"}
           </button>
           <button type="button" className={btnSecondary} onClick={() => setEditing(false)}>
             Cancelar

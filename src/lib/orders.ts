@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
@@ -37,6 +37,35 @@ export async function resolveByName(
   const [created] = await tx.insert(table).values({ name: clean } as any).returning({ id: table.id });
   return created.id as number;
 }
+
+/** Igual a resolveByName, mas para vários nomes de uma vez (2 consultas no total). */
+export async function resolveManyByName(tx: Tx, table: NamedTable, names: string[]) {
+  const clean = (n: string) => n.trim().replace(/\s+/g, " ");
+  const wanted = new Map<string, string>();
+  for (const n of names) {
+    const c = clean(n);
+    if (c) wanted.set(c.toLowerCase(), c);
+  }
+  const ids = new Map<string, number>();
+  if (!wanted.size) return ids;
+  const found = await tx
+    .select({ id: table.id, name: table.name })
+    .from(table)
+    .where(inArray(sql`lower(${table.name})`, [...wanted.keys()]));
+  for (const f of found) ids.set(String(f.name).toLowerCase(), f.id as number);
+  const missing = [...wanted.entries()].filter(([k]) => !ids.has(k)).map(([, v]) => ({ name: v }));
+  if (missing.length) {
+    const created = await tx
+      .insert(table)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .values(missing as any)
+      .returning({ id: table.id, name: table.name });
+    for (const c of created) ids.set(String(c.name).toLowerCase(), c.id as number);
+  }
+  return ids;
+}
+
+export const nameKey = (n: string) => n.trim().replace(/\s+/g, " ").toLowerCase();
 
 export async function loadOrder(id: number) {
   return db.query.orders.findFirst({

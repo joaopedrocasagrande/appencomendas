@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -26,7 +26,7 @@ import {
 } from "@/db/schema";
 import { assertAdmin, assertUser } from "@/lib/auth";
 import { parseDecimal } from "@/lib/format";
-import { resolveByName } from "@/lib/orders";
+import { nameKey, resolveByName, resolveManyByName } from "@/lib/orders";
 import { orderSchema, type OrderInput } from "./types";
 
 export type ActionResult = { error?: string; ok?: boolean } | undefined;
@@ -59,9 +59,17 @@ export async function saveOrder(raw: OrderInput): Promise<{ error?: string; id?:
   }
 
   const orderId = await db.transaction(async (tx) => {
-    const supplierId = await resolveByName(tx, suppliers, input.supplierName);
-    const transportModeId = await resolveByName(tx, transportModes, input.transportModeName);
-    const carrierId = await resolveByName(tx, carriers, input.carrierName);
+    // Consultas independentes vão em paralelo para reduzir idas ao banco.
+    const [supplierId, transportModeId, carrierId, productIds] = await Promise.all([
+      resolveByName(tx, suppliers, input.supplierName),
+      resolveByName(tx, transportModes, input.transportModeName),
+      resolveByName(tx, carriers, input.carrierName),
+      resolveManyByName(
+        tx,
+        products,
+        input.items.map((i) => i.productName),
+      ),
+    ]);
 
     const values = {
       title: input.title,
@@ -96,17 +104,7 @@ export async function saveOrder(raw: OrderInput): Promise<{ error?: string; id?:
     }
 
     // Itens: atualiza os existentes (preservando a conferência), cria os novos e remove os retirados.
-    const keepItemIds = input.items.map((i) => i.id).filter((x): x is number => !!x);
-    await tx
-      .delete(orderItems)
-      .where(
-        keepItemIds.length
-          ? and(eq(orderItems.orderId, id), notInArray(orderItems.id, keepItemIds))
-          : eq(orderItems.orderId, id),
-      );
-
-    for (const [position, item] of input.items.entries()) {
-      const productId = (await resolveByName(tx, products, item.productName))!;
+    const itemRows = input.items.map((item, position) => {
       let sizes: SizeBreakdown | null = null;
       if (item.sizes && item.sizes.length) {
         sizes = {};
@@ -116,56 +114,76 @@ export async function saveOrder(raw: OrderInput): Promise<{ error?: string; id?:
         }
         if (!Object.keys(sizes).length) sizes = null;
       }
-      const row = {
-        orderId: id,
-        productId,
-        variant: item.variant.trim() || null,
-        boxes: dec(item.boxes),
-        piecesPerBox: dec(item.piecesPerBox),
-        grids: dec(item.grids),
-        piecesPerGrid: dec(item.piecesPerGrid),
-        totalPieces: Math.round(parseDecimal(item.totalPieces) ?? 0),
-        unitPrice: dec(item.unitPrice, "0")!,
-        sizes,
-        position,
+      return {
+        id: item.id,
+        row: {
+          orderId: id,
+          productId: productIds.get(nameKey(item.productName))!,
+          variant: item.variant.trim() || null,
+          boxes: dec(item.boxes),
+          piecesPerBox: dec(item.piecesPerBox),
+          grids: dec(item.grids),
+          piecesPerGrid: dec(item.piecesPerGrid),
+          totalPieces: Math.round(parseDecimal(item.totalPieces) ?? 0),
+          unitPrice: dec(item.unitPrice, "0")!,
+          sizes,
+          position,
+        },
       };
-      if (item.id) {
-        await tx
-          .update(orderItems)
-          .set(row)
-          .where(and(eq(orderItems.id, item.id), eq(orderItems.orderId, id)));
-      } else {
-        await tx.insert(orderItems).values(row);
-      }
-    }
+    });
+    const keepItemIds = itemRows.map((i) => i.id).filter((x): x is number => !!x);
+    const newItems = itemRows.filter((i) => !i.id).map((i) => i.row);
 
-    // Outras despesas
-    const keepExpenseIds = input.expenses.map((e) => e.id).filter((x): x is number => !!x);
-    await tx
-      .delete(orderExpenses)
-      .where(
-        keepExpenseIds.length
-          ? and(eq(orderExpenses.orderId, id), notInArray(orderExpenses.id, keepExpenseIds))
-          : eq(orderExpenses.orderId, id),
-      );
-    for (const e of input.expenses) {
-      const row = {
+    const expenseRows = input.expenses.map((e) => ({
+      id: e.id,
+      row: {
         orderId: id,
         description: e.description,
         amount: dec(e.amount, "0")!,
         currency: e.currency,
         chargedBySupplier: e.chargedBySupplier,
         paid: e.chargedBySupplier ? false : e.paid,
-      };
-      if (e.id) {
-        await tx
-          .update(orderExpenses)
-          .set(row)
-          .where(and(eq(orderExpenses.id, e.id), eq(orderExpenses.orderId, id)));
-      } else {
-        await tx.insert(orderExpenses).values(row);
-      }
-    }
+      },
+    }));
+    const keepExpenseIds = expenseRows.map((e) => e.id).filter((x): x is number => !!x);
+    const newExpenses = expenseRows.filter((e) => !e.id).map((e) => e.row);
+
+    await Promise.all([
+      tx
+        .delete(orderItems)
+        .where(
+          keepItemIds.length
+            ? and(eq(orderItems.orderId, id), notInArray(orderItems.id, keepItemIds))
+            : eq(orderItems.orderId, id),
+        ),
+      tx
+        .delete(orderExpenses)
+        .where(
+          keepExpenseIds.length
+            ? and(eq(orderExpenses.orderId, id), notInArray(orderExpenses.id, keepExpenseIds))
+            : eq(orderExpenses.orderId, id),
+        ),
+    ]);
+    await Promise.all([
+      ...itemRows
+        .filter((i) => i.id)
+        .map((i) =>
+          tx
+            .update(orderItems)
+            .set(i.row)
+            .where(and(eq(orderItems.id, i.id!), eq(orderItems.orderId, id))),
+        ),
+      newItems.length ? tx.insert(orderItems).values(newItems) : null,
+      ...expenseRows
+        .filter((e) => e.id)
+        .map((e) =>
+          tx
+            .update(orderExpenses)
+            .set(e.row)
+            .where(and(eq(orderExpenses.id, e.id!), eq(orderExpenses.orderId, id))),
+        ),
+      newExpenses.length ? tx.insert(orderExpenses).values(newExpenses) : null,
+    ]);
     return id;
   });
 
@@ -434,37 +452,47 @@ export async function saveConference(orderId: number, input: ConferenceInput): P
   const trackingIds = new Set(order.trackings.map((t) => t.id));
 
   await db.transaction(async (tx) => {
-    for (const it of input.items) {
-      if (!itemIds.has(it.id)) continue;
-      let receivedSizes: SizeBreakdown | null = null;
-      if (it.receivedSizes) {
-        receivedSizes = {};
-        for (const [size, q] of Object.entries(it.receivedSizes)) {
-          const n = intOrNull(q);
-          if (n !== null) receivedSizes[size] = n;
+    // Uma única instrução por tabela (UPDATE ... FROM VALUES), em vez de uma por linha.
+    const itemValues = input.items
+      .filter((it) => itemIds.has(it.id))
+      .map((it) => {
+        let receivedSizes: SizeBreakdown | null = null;
+        if (it.receivedSizes) {
+          receivedSizes = {};
+          for (const [size, q] of Object.entries(it.receivedSizes)) {
+            const n = intOrNull(q);
+            if (n !== null) receivedSizes[size] = n;
+          }
+          if (!Object.keys(receivedSizes).length) receivedSizes = null;
         }
-        if (!Object.keys(receivedSizes).length) receivedSizes = null;
-      }
-      await tx
-        .update(orderItems)
-        .set({
-          receivedQty: intOrNull(it.receivedQty),
-          defectiveQty: intOrNull(it.defectiveQty),
-          checkNotes: it.checkNotes.trim() || null,
-          receivedSizes,
-        })
-        .where(and(eq(orderItems.id, it.id), eq(orderItems.orderId, orderId)));
+        return sql`(${it.id}::int, ${intOrNull(it.receivedQty)}::int, ${intOrNull(it.defectiveQty)}::int, ${
+          it.checkNotes.trim() || null
+        }::text, ${receivedSizes ? JSON.stringify(receivedSizes) : null}::jsonb)`;
+      });
+    if (itemValues.length) {
+      await tx.execute(sql`
+        update order_items as oi set
+          received_qty = v.rq, defective_qty = v.dq, check_notes = v.cn, received_sizes = v.rs
+        from (values ${sql.join(itemValues, sql`, `)}) as v(id, rq, dq, cn, rs)
+        where oi.id = v.id and oi.order_id = ${orderId}`);
     }
-    for (const t of input.trackings) {
-      if (!trackingIds.has(t.id)) continue;
-      await tx
-        .update(trackings)
-        .set({
-          received: t.received,
-          receivedDate: t.received && /^\d{4}-\d{2}-\d{2}$/.test(t.receivedDate) ? t.receivedDate : null,
-          ...(t.received ? { status: "entregue" as const } : {}),
-        })
-        .where(and(eq(trackings.id, t.id), eq(trackings.orderId, orderId)));
+
+    const trackingValues = input.trackings
+      .filter((t) => trackingIds.has(t.id))
+      .map(
+        (t) =>
+          sql`(${t.id}::int, ${t.received}::boolean, ${
+            t.received && /^\d{4}-\d{2}-\d{2}$/.test(t.receivedDate) ? t.receivedDate : null
+          }::date)`,
+      );
+    if (trackingValues.length) {
+      await tx.execute(sql`
+        update trackings as t set
+          received = v.rec,
+          received_date = v.rdate,
+          status = case when v.rec then 'entregue' else t.status end
+        from (values ${sql.join(trackingValues, sql`, `)}) as v(id, rec, rdate)
+        where t.id = v.id and t.order_id = ${orderId}`);
     }
 
     if (input.updateStatus && AUTO_STATUS_FROM.includes(order.status)) {

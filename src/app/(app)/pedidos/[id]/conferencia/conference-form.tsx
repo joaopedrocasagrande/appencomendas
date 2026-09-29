@@ -87,7 +87,6 @@ export function ConferenceForm({
         if (res.error) setError(res.error);
         else {
           router.push(`/pedidos/${orderId}`);
-          router.refresh();
         }
       } catch {
         setError("Não foi possível salvar. Verifique sua conexão e tente novamente.");

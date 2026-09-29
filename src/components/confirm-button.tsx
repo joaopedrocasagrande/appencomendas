@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { SubmitButton } from "./submit-button";
 
 /** Botão de envio que pede confirmação antes (usado para exclusões). */
 export function ConfirmButton({
@@ -13,13 +14,8 @@ export function ConfirmButton({
   children?: ReactNode;
 }) {
   return (
-    <button
-      className={className}
-      onClick={(e) => {
-        if (!confirm(message)) e.preventDefault();
-      }}
-    >
+    <SubmitButton className={className} confirmMessage={message} pendingText="Excluindo...">
       {children}
-    </button>
+    </SubmitButton>
   );
 }
