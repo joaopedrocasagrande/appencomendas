@@ -1,0 +1,1159 @@
+<title>Encomendas China</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: app de operação — cabeçalho fixo, conteúdo em coluna única no celular e em grade no computador; menu inferior no celular. */
+:root {
+  --bg: #f3f4f1;
+  --surface: #ffffff;
+  --surface-2: #eceee9;
+  --fg: #1c2530;
+  --muted: #5d6874;
+  --line: #d9ddd6;
+  --accent: #c2481b;       /* laranja de contêiner */
+  --accent-fg: #ffffff;
+  --accent-soft: #fbe7dd;
+  --navy: #1f3a5a;
+  --good: #1f7a4a; --good-soft: #dff2e6;
+  --warn: #9a5b00; --warn-soft: #fcefd6;
+  --bad: #b3261e;  --bad-soft: #fbe2df;
+  --info: #1f5a9a; --info-soft: #e1ecf8;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171d; --surface: #1a2129; --surface-2: #222b35; --fg: #e8ecef; --muted: #9aa6b2; --line: #2e3945;
+    --accent: #e86a3a; --accent-fg: #1a1208; --accent-soft: #3a2218; --navy: #9cc0e8;
+    --good: #6fd19b; --good-soft: #173a28; --warn: #f0b659; --warn-soft: #3a2c12; --bad: #ff8a80; --bad-soft: #43201d;
+    --info: #8fbcf0; --info-soft: #1b2e45; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12171d; --surface: #1a2129; --surface-2: #222b35; --fg: #e8ecef; --muted: #9aa6b2; --line: #2e3945;
+  --accent: #e86a3a; --accent-fg: #1a1208; --accent-soft: #3a2218; --navy: #9cc0e8;
+  --good: #6fd19b; --good-soft: #173a28; --warn: #f0b659; --warn-soft: #3a2c12; --bad: #ff8a80; --bad-soft: #43201d;
+  --info: #8fbcf0; --info-soft: #1b2e45; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: 1.45rem; }
+h2 { font-size: 1.05rem; }
+.tab { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-size: .9em; }
+.muted { color: var(--muted); }
+.small { font-size: .82rem; }
+
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-in { max-width: 1100px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--navy); display: flex; align-items: center; gap: 8px; }
+.brand-mark { width: 22px; height: 16px; border-radius: 3px; background: repeating-linear-gradient(90deg, var(--accent) 0 3px, transparent 3px 5px); border: 2px solid var(--accent); }
+nav.desk { display: none; gap: 2px; }
+nav.desk button { background: none; border: 0; padding: 7px 12px; border-radius: 8px; color: var(--muted); font: 500 .92rem var(--font-body); cursor: pointer; }
+nav.desk button.on { background: var(--accent-soft); color: var(--accent); }
+.rate-chip { margin-left: auto; border: 0; border-radius: 999px; padding: 5px 11px; font: 500 .85rem var(--font-body); cursor: pointer; background: var(--surface-2); color: var(--fg); }
+.rate-chip.stale { background: var(--warn-soft); color: var(--warn); }
+nav.mob { position: fixed; inset: auto 0 0 0; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+nav.mob button { background: none; border: 0; padding: 9px 2px 8px; font: 500 .72rem var(--font-body); color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
+nav.mob button.on { color: var(--accent); }
+nav.mob svg { width: 21px; height: 21px; }
+@media (min-width: 820px) { nav.desk { display: flex; } nav.mob { display: none; } main.page { padding-bottom: 40px; } }
+
+main.page { max-width: 1100px; margin: 0 auto; padding: 16px 16px 96px; display: grid; gap: 14px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.head .left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.back { background: none; border: 0; font-size: 1.3rem; color: var(--muted); cursor: pointer; padding: 2px 8px; border-radius: 6px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.card > .ch { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.card > .cb { padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.grid { display: grid; gap: 10px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.cols2 { display: grid; gap: 14px; }
+@media (min-width: 820px) { .cols2 { grid-template-columns: 1fr 1fr; } }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.between { justify-content: space-between; }
+
+label.f { display: grid; gap: 4px; font-size: .8rem; color: var(--muted); font-weight: 500; min-width: 0; }
+input, select, textarea { width: 100%; font: 400 16px var(--font-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+@media (min-width: 820px) { input, select, textarea { font-size: .92rem; } }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input[type=checkbox], input[type=radio] { width: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
+label.chk { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--fg); cursor: pointer; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 8px; padding: 8px 14px; font: 600 .9rem var(--font-body); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.dan { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); }
+.btn.sm { padding: 4px 10px; font-size: .8rem; }
+.btn:disabled { opacity: .55; cursor: default; }
+.link { background: none; border: 0; color: var(--info); text-decoration: underline; cursor: pointer; font: inherit; padding: 0; }
+
+.pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 9px; font-size: .75rem; font-weight: 600; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.p-good { background: var(--good-soft); color: var(--good); }
+.p-warn { background: var(--warn-soft); color: var(--warn); }
+.p-bad { background: var(--bad-soft); color: var(--bad); }
+.p-info { background: var(--info-soft); color: var(--info); }
+.p-acc { background: var(--accent-soft); color: var(--accent); }
+
+.stats { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; text-align: left; font: inherit; color: inherit; }
+button.stat { cursor: pointer; }
+.stat .l { font-size: .75rem; color: var(--muted); }
+.stat .v { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.stat .s { font-size: .75rem; color: var(--muted); }
+.v.good { color: var(--good); } .v.bad { color: var(--bad); } .v.warn { color: var(--warn); }
+
+.list { display: grid; }
+.list > * + * { border-top: 1px solid var(--line); }
+.li { padding: 10px 0; display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.order-card { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--navy); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 8px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.order-card.late { border-left-color: var(--bad); }
+.order-card:hover { border-color: var(--accent); }
+.num { color: var(--muted); font-family: var(--font-mono); font-size: .85em; }
+.empty { padding: 26px 10px; text-align: center; color: var(--muted); }
+.banner { border-radius: var(--radius); padding: 10px 12px; font-size: .9rem; }
+.b-warn { background: var(--warn-soft); color: var(--warn); }
+.b-info { background: var(--info-soft); color: var(--info); }
+.b-bad { background: var(--bad-soft); color: var(--bad); }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th { text-align: left; font-size: .75rem; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+.itembox { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: grid; gap: 10px; }
+.itembox.ok { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+.itembox.diff { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
+.sizes { display: flex; flex-wrap: wrap; gap: 8px; background: var(--surface-2); padding: 8px; border-radius: 8px; }
+.sizes .sz { display: flex; gap: 4px; width: 150px; }
+.sizes .sz input:first-child { width: 60px; text-align: center; }
+.sticky-foot { position: sticky; bottom: 72px; z-index: 10; background: var(--surface); border: 1px solid var(--accent); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 10px; box-shadow: 0 6px 20px rgb(0 0 0 / .12); }
+@media (min-width: 820px) { .sticky-foot { bottom: 12px; } }
+.radios { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.radio { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: flex; gap: 8px; align-items: flex-start; cursor: pointer; background: var(--surface); }
+.radio.on { border-color: var(--accent); background: var(--accent-soft); }
+.toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 50; background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-weight: 500; font-size: .9rem; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font: 500 .85rem var(--font-body); cursor: pointer; color: var(--fg); }
+.tabs button.on { background: var(--navy); color: var(--surface); border-color: var(--navy); }
+.err { color: var(--bad); font-size: .85rem; }
+details > summary { cursor: pointer; font-weight: 600; }
+.loading { display: grid; place-items: center; min-height: 50vh; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div id="root"><div class="loading">Carregando…</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+<script>
+(function () {
+"use strict";
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+// Permite escrever style="a:b;c:d" nos modelos (o React exige objeto).
+function cssToObj(css) {
+  const o = {};
+  for (const part of String(css).split(";")) {
+    const i = part.indexOf(":");
+    if (i < 0) continue;
+    const k = part.slice(0, i).trim(), v = part.slice(i + 1).trim();
+    if (!k) continue;
+    o[k.startsWith("--") ? k : k.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v;
+  }
+  return o;
+}
+function h(type, props, ...children) {
+  if (props && typeof props.style === "string") props = { ...props, style: props.style ? cssToObj(props.style) : undefined };
+  return React.createElement(type, props, ...children);
+}
+const html = htm.bind(h);
+
+// ---------------- Formatação ----------------
+const fmtBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const fmtUSD = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" });
+function money(v, cur = "BRL") {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  return cur === "USD" ? fmtUSD.format(v).replace("US$", "$") : fmtBRL.format(v);
+}
+function num(v, d = 2) {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: d }).format(v);
+}
+function fdate(iso) { if (!iso) return "—"; const [y, m, d] = iso.slice(0, 10).split("-"); return `${d}/${m}/${y}`; }
+function parseDec(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  let s = String(v).trim().replace(/\s/g, "").replace(/^R\$|^US\$|^\$/, "");
+  if (!s) return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+function toInput(v) { if (v === null || v === undefined || v === "") return ""; const n = Number(v); return Number.isFinite(n) ? String(Math.round(n * 10000) / 10000).replace(".", ",") : ""; }
+function today() { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()); }
+function addDays(iso, days) { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+const norm = (s) => (s || "").trim().replace(/\s+/g, " ");
+const key = (s) => norm(s).toLowerCase();
+const cx = (...a) => a.filter(Boolean).join(" ");
+
+// ---------------- Rótulos ----------------
+const ORDER_STATUS = { cotacao: "Cotação", confirmado: "Confirmado", em_producao: "Em produção", enviado: "Enviado", recebido_parcial: "Recebido parcialmente", recebido: "Recebido", finalizado: "Finalizado", cancelado: "Cancelado" };
+const ORDER_TONE = { cotacao: "", confirmado: "p-info", em_producao: "p-info", enviado: "p-warn", recebido_parcial: "p-warn", recebido: "p-good", finalizado: "p-good", cancelado: "p-bad" };
+const CLOSED = ["recebido", "finalizado", "cancelado"];
+const TRK_STATUS = { aguardando_postagem: "Aguardando postagem", postado: "Postado", em_transito: "Em trânsito", fiscalizacao: "Fiscalização / Alfândega", aguardando_pagamento: "Aguardando pagamento de imposto", saiu_entrega: "Saiu para entrega", entregue: "Entregue", devolvido: "Devolvido", extraviado: "Extraviado" };
+const TRK_TONE = { aguardando_postagem: "", postado: "p-info", em_transito: "p-info", fiscalizacao: "p-warn", aguardando_pagamento: "p-warn", saiu_entrega: "p-info", entregue: "p-good", devolvido: "p-bad", extraviado: "p-bad" };
+const PAY_LABEL = { pendente: "Pagamento pendente", parcial: "Pago parcialmente", pago: "Pago", pago_a_mais: "Pago a mais" };
+const PAY_TONE = { pendente: "p-bad", parcial: "p-warn", pago: "p-good", pago_a_mais: "p-info" };
+const REC_LABEL = { nao_recebido: "Não recebido", parcial: "Recebido parcialmente", completo: "Recebido completo", divergencia: "Recebido com divergência" };
+const REC_TONE = { nao_recebido: "", parcial: "p-warn", completo: "p-good", divergencia: "p-bad" };
+const TAX_LABEL = { sem: "Sem imposto", incluso: "Incluso no pedido", por_fora: "Pago por fora" };
+const TAX_HINT = { sem: "Este pedido não tem imposto.", incluso: "Já está dentro do valor pago ao fornecedor.", por_fora: "Pago depois, separado. Lance no pedido quando pagar." };
+const VARIANTS = ["Masculino", "Feminino", "Infantil", "Kit Infantil", "Goleiro", "Manga longa"];
+const SIZES = ["PP", "P", "M", "G", "GG", "XGG", "2XL", "3XL", "4XL"];
+
+// ---------------- Cálculos ----------------
+function convert(amount, from, to, rate) { if (from === to) return amount; if (!rate) return null; return from === "USD" ? amount * rate : amount / rate; }
+const n0 = (v) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+const r2 = (v) => Math.round(v * 100) / 100;
+
+function totals(o) {
+  const cur = o.currency || "BRL";
+  const orate = o.rate > 0 ? o.rate : null;
+  let missingRate = false;
+  const to = (amt, from, rate, target) => { const v = convert(amt, from, target, rate || orate); if (v === null) { missingRate = true; return 0; } return v; };
+  const items = o.items || [], expenses = o.expenses || [], pays = o.payments || [], taxes = o.taxPayments || [];
+  const pieces = items.reduce((s, i) => s + n0(i.pieces), 0);
+  const itemsTotal = items.reduce((s, i) => s + n0(i.pieces) * n0(i.unitPrice), 0);
+  const supplierExpenses = expenses.filter((e) => e.chargedBySupplier).reduce((s, e) => s + to(n0(e.amount), e.currency, null, cur), 0);
+  const supplierTotal = r2(itemsTotal + n0(o.freight) - n0(o.discount) + supplierExpenses);
+  const paid = r2(pays.reduce((s, p) => s + to(n0(p.amount), p.currency, p.rate, cur), 0));
+  const pending = r2(supplierTotal - paid);
+  let payStatus = "pendente";
+  if (supplierTotal <= 0 && paid <= 0) payStatus = "pendente";
+  else if (pending < -0.01) payStatus = "pago_a_mais";
+  else if (pending <= 0.01) payStatus = "pago";
+  else if (paid > 0) payStatus = "parcial";
+  const taxPaidBRL = r2(o.taxMode === "por_fora" ? taxes.reduce((s, t) => s + to(n0(t.amount), t.currency, t.rate, "BRL"), 0) : 0);
+  const otherBRL = expenses.filter((e) => !e.chargedBySupplier).reduce((s, e) => s + to(n0(e.amount), e.currency, null, "BRL"), 0);
+  const extrasBRL = r2(taxPaidBRL + otherBRL);
+  const extrasPendingBRL = r2(expenses.filter((e) => !e.chargedBySupplier && !e.paid).reduce((s, e) => s + to(n0(e.amount), e.currency, null, "BRL"), 0));
+  const taxAwaiting = o.taxMode === "por_fora" && taxes.length === 0;
+  const taxIncludedBRL = o.taxMode === "incluso" ? r2(to(n0(o.taxAmount), cur, null, "BRL")) : 0;
+  const paidBRL = pays.reduce((s, p) => s + to(n0(p.amount), p.currency, p.rate, "BRL"), 0);
+  const pendingBRL = to(Math.max(pending, 0), cur, null, "BRL");
+  const landedBRL = r2(paidBRL + pendingBRL + extrasBRL);
+  return {
+    cur, orate, pieces, itemsTotal: r2(itemsTotal), freight: n0(o.freight), discount: n0(o.discount), supplierExpenses: r2(supplierExpenses),
+    supplierTotal, paid, paidBRL: r2(paidBRL), pending, payStatus, taxPaidBRL, taxAwaiting, taxTotalBRL: r2(taxPaidBRL + taxIncludedBRL),
+    extrasBRL, extrasPendingBRL, landedBRL, costPerPiece: pieces > 0 ? landedBRL / pieces : null, missingRate,
+  };
+}
+function receipt(o) {
+  const items = o.items || [], trk = o.trackings || [];
+  const expected = items.reduce((s, i) => s + n0(i.pieces), 0);
+  const received = items.reduce((s, i) => s + n0(i.receivedQty), 0);
+  const defective = items.reduce((s, i) => s + n0(i.defectiveQty), 0);
+  const checked = items.some((i) => i.receivedQty !== null && i.receivedQty !== undefined);
+  const pk = trk.filter((t) => t.received).length;
+  let status;
+  if (!checked && pk === 0) status = "nao_recebido";
+  else if (defective > 0 || items.some((i) => n0(i.receivedQty) > n0(i.pieces))) status = "divergencia";
+  else if (items.length && items.every((i) => n0(i.receivedQty) === n0(i.pieces))) status = "completo";
+  else status = "parcial";
+  return { status, expected, received, defective, missing: Math.max(expected - received, 0), pk, pt: trk.length };
+}
+const other = (v, cur, rate) => { const o = cur === "USD" ? "BRL" : "USD"; const c = convert(v, cur, o, rate); return c === null ? null : "≈ " + money(c, o); };
+const isLate = (o) => !!o.expectedDate && o.expectedDate < today() && !CLOSED.includes(o.status);
+function rateFor(rates, day) {
+  let best = null;
+  for (const r of rates) if (r.id <= day && (!best || r.id > best.id)) best = r;
+  return best;
+}
+function trackingLink(code, carrier) {
+  const c = encodeURIComponent(code.trim());
+  if (carrier && carrier.trackingUrl && carrier.trackingUrl.includes("{code}")) return carrier.trackingUrl.replace("{code}", c);
+  return "https://t.17track.net/pt#nums=" + c;
+}
+
+// ---------------- Dados (capacidade db do Claude) ----------------
+const COLS = { orders: "orders", suppliers: "suppliers", products: "products", modes: "modes", carriers: "carriers", methods: "methods", rates: "rates" };
+const ENT = {
+  suppliers: { title: "Fornecedores", one: "fornecedor", fields: [["name", "Nome"], ["contact", "Contato (WeChat, WhatsApp...)"], ["notes", "Observações"]], ref: "supplierId" },
+  products: { title: "Produtos", one: "produto", fields: [["name", "Nome"], ["notes", "Observações"]] },
+  modes: { title: "Modalidades", one: "modalidade", fields: [["name", "Nome"], ["defaultDays", "Prazo médio (dias)", "int"]], ref: "modeId" },
+  carriers: { title: "Transportadoras", one: "transportadora", fields: [["name", "Nome"], ["trackingUrl", "Link de rastreio (use {code})"]], ref: "carrierId" },
+  methods: { title: "Formas de pagamento", one: "forma de pagamento", fields: [["name", "Nome"]] },
+};
+
+// Fila por documento: uma escrita de cada vez no mesmo documento.
+const queues = new Map();
+function queued(path, fn) {
+  const prev = queues.get(path) || Promise.resolve();
+  const next = prev.catch(() => {}).then(fn);
+  queues.set(path, next);
+  return next;
+}
+
+function useStore() {
+  const [st, setSt] = useState({ ready: false, db: null, noDb: false, canWrite: true, isAdmin: false, data: { orders: [], suppliers: [], products: [], modes: [], carriers: [], methods: [], rates: [] }, loaded: {} });
+  useEffect(() => {
+    let unsubs = [], alive = true;
+    (async () => {
+      const [db, user] = await Promise.all([window.claude?.use?.("db") ?? null, window.claude?.use?.("user") ?? null]);
+      if (!alive) return;
+      if (!db) { setSt((s) => ({ ...s, ready: true, noDb: true })); return; }
+      let canWrite = true, isAdmin = false;
+      try { const w = await user?.can("data.write"); if (w === false) canWrite = false; } catch (e) {}
+      try { isAdmin = !!((await user?.canEdit()) || (await user?.isOwner())); } catch (e) {}
+      setSt((s) => ({ ...s, ready: true, db, canWrite, isAdmin }));
+      for (const name of Object.keys(COLS)) {
+        const u = db.collection(COLS[name]).onSnapshot(
+          (snap) => {
+            const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            setSt((s) => ({ ...s, data: { ...s.data, [name]: rows }, loaded: { ...s.loaded, [name]: true } }));
+          },
+          (e) => console.error("db", name, e),
+        );
+        unsubs.push(u);
+      }
+    })();
+    return () => { alive = false; unsubs.forEach((u) => u()); };
+  }, []);
+  return st;
+}
+
+function makeApi(db) {
+  const col = (c) => db.collection(c);
+  return {
+    async saveOrder(id, body) { const path = "orders/" + id; return queued(path, () => col("orders").doc(id).set(body)); },
+    async patchOrder(id, patch) { const path = "orders/" + id; return queued(path, () => col("orders").doc(id).update({ ...patch, updatedAt: new Date().toISOString() })); },
+    async deleteOrder(id) { return queued("orders/" + id, () => col("orders").doc(id).delete()); },
+    async saveEntity(c, id, body) { return queued(c + "/" + id, () => col(c).doc(id).set(body)); },
+    async deleteEntity(c, id) { return queued(c + "/" + id, () => col(c).doc(id).delete()); },
+    async setRate(day, value) { return queued("rates/" + day, () => col("rates").doc(day).set({ usdBrl: value, updatedAt: new Date().toISOString() })); },
+    async deleteRate(day) { return queued("rates/" + day, () => col("rates").doc(day).delete()); },
+  };
+}
+
+// Encontra um cadastro pelo nome (sem diferenciar maiúsculas) ou cria na hora.
+async function resolveName(api, list, c, name) {
+  const n = norm(name);
+  if (!n) return null;
+  const found = list.find((x) => key(x.name) === key(n));
+  if (found) return found.id;
+  const id = uid();
+  await api.saveEntity(c, id, { name: n, createdAt: new Date().toISOString() });
+  return id;
+}
+
+// ---------------- Componentes básicos ----------------
+function Field({ label, children, hint, className }) {
+  return html`<label class=${cx("f", className)}><span>${label}</span>${children}${hint ? html`<span class="small muted">${hint}</span>` : null}</label>`;
+}
+function Card({ title, actions, children }) {
+  return html`<section class="card">${title || actions ? html`<div class="ch"><h2>${title}</h2>${actions}</div>` : null}<div class="cb">${children}</div></section>`;
+}
+function Pill({ tone, children }) { return html`<span class=${cx("pill", tone)}>${children}</span>`; }
+function Stat({ label, value, sub, tone, onClick }) {
+  const body = html`<div class="l">${label}</div><div class=${cx("v", tone)}>${value}</div>${sub ? html`<div class="s">${sub}</div>` : null}`;
+  return onClick ? html`<button type="button" class="stat" onClick=${onClick}>${body}</button>` : html`<div class="stat">${body}</div>`;
+}
+function Confirm({ label = "Excluir", question = "Confirmar exclusão?", onConfirm, small }) {
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!ask) return html`<button type="button" class=${cx("btn dan", small && "sm")} onClick=${() => setAsk(true)}>${label}</button>`;
+  return html`<span class="row"><span class="small">${question}</span>
+    <button type="button" class=${cx("btn dan", small && "sm")} disabled=${busy} onClick=${async () => { setBusy(true); try { await onConfirm(); } finally { setBusy(false); setAsk(false); } }}>${busy ? "Excluindo…" : "Sim, excluir"}</button>
+    <button type="button" class=${cx("btn", small && "sm")} onClick=${() => setAsk(false)}>Não</button></span>`;
+}
+function Head({ title, back, actions }) {
+  return html`<div class="head"><div class="left">${back ? html`<button class="back" aria-label="Voltar" onClick=${back}>←</button>` : null}<h1>${title}</h1></div>${actions ? html`<div class="row">${actions}</div>` : null}</div>`;
+}
+
+const ICONS = {
+  painel: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>`,
+  pedidos: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>`,
+  novo: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>`,
+  dolar: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M16.5 7.5c-.8-1.2-2.4-2-4.5-2-2.6 0-4.3 1.3-4.3 3.1 0 4.4 9 2.4 9 6.9 0 1.9-1.9 3.2-4.7 3.2-2.3 0-4-.9-4.8-2.2"/></svg>`,
+  cadastros: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>`,
+};
+const NAV = [["painel", "Painel"], ["pedidos", "Pedidos"], ["novo", "Novo"], ["dolar", "Dólar"], ["cadastros", "Cadastros"]];
+
+// ---------------- App ----------------
+function App() {
+  const st = useStore();
+  const api = useMemo(() => (st.db ? makeApi(st.db) : null), [st.db]);
+  const [view, setView] = useState({ name: "painel" });
+  const [filters, setFilters] = useState({});
+  const [toast, setToast] = useState(null);
+  const notify = useCallback((m) => { setToast(m); clearTimeout(notify.t); notify.t = setTimeout(() => setToast(null), 2600); }, []);
+  const go = (name, extra = {}) => { setView({ name, ...extra }); window.scrollTo(0, 0); };
+  const D = st.data;
+  const t = today();
+  const cur = rateFor(D.rates, t);
+  const byId = useMemo(() => {
+    const m = {};
+    for (const k of ["suppliers", "products", "modes", "carriers", "methods"]) m[k] = Object.fromEntries(D[k].map((x) => [x.id, x]));
+    return m;
+  }, [D]);
+
+  if (!st.ready) return html`<div class="loading">Carregando…</div>`;
+  if (st.noDb) return html`<main class="page"><div class="card"><div class="cb"><h1>Encomendas China</h1><p>Para ver e salvar os pedidos, abra este app pelo claude.ai (navegador ou app do Claude) com a sua conta.</p></div></div></main>`;
+
+  const ctx = { st, api, D, byId, go, notify, filters, setFilters, today: t, curRate: cur, canWrite: st.canWrite, isAdmin: st.isAdmin };
+  const active = view.name === "pedido" || view.name === "conferencia" || view.name === "editar" ? "pedidos" : view.name;
+  let page;
+  if (view.name === "painel") page = html`<${Painel} ctx=${ctx} />`;
+  else if (view.name === "pedidos") page = html`<${Pedidos} ctx=${ctx} />`;
+  else if (view.name === "novo") page = html`<${OrderForm} key="novo" ctx=${ctx} />`;
+  else if (view.name === "editar") page = html`<${OrderForm} key=${"e" + view.id} ctx=${ctx} id=${view.id} />`;
+  else if (view.name === "pedido") page = html`<${OrderDetail} ctx=${ctx} id=${view.id} />`;
+  else if (view.name === "conferencia") page = html`<${Conference} ctx=${ctx} id=${view.id} />`;
+  else if (view.name === "dolar") page = html`<${Rates} ctx=${ctx} />`;
+  else page = html`<${Cadastros} ctx=${ctx} />`;
+
+  return html`
+    <header class="top"><div class="top-in">
+      <button class="brand" style="background:none;border:0;cursor:pointer" onClick=${() => go("painel")}><span class="brand-mark"></span>Encomendas</button>
+      <nav class="desk">${NAV.map(([k, l]) => html`<button key=${k} class=${active === k ? "on" : ""} onClick=${() => go(k)}>${l}</button>`)}</nav>
+      <button class=${cx("rate-chip", (!cur || cur.id !== t) && "stale")} onClick=${() => go("dolar")} title=${cur ? "Cotação de " + fdate(cur.id) : "Nenhuma cotação"}>$1 = ${cur ? money(cur.usdBrl) : "definir"}${cur && cur.id !== t ? " ⚠" : ""}</button>
+    </div></header>
+    ${!st.canWrite ? html`<div style="max-width:1100px;margin:10px auto 0;padding:0 16px"><div class="banner b-info">Você está só visualizando. Peça ao dono do app acesso de "Contributor" para cadastrar e editar.</div></div>` : null}
+    <main class="page">${page}</main>
+    <nav class="mob">${NAV.map(([k, l]) => html`<button key=${k} class=${active === k ? "on" : ""} onClick=${() => go(k)}>${ICONS[k]}${l}</button>`)}</nav>
+    ${toast ? html`<div class="toast" role="status">${toast}</div>` : null}`;
+}
+
+// ---------------- Painel ----------------
+function Painel({ ctx }) {
+  const { D, byId, go, setFilters, today: t, curRate } = ctx;
+  const rows = D.orders.filter((o) => o.status !== "cancelado").map((o) => ({ o, t: totals(o), r: receipt(o) }));
+  const open = rows.filter((x) => !CLOSED.includes(x.o.status));
+  const pend = { USD: 0, BRL: 0 }; let extras = 0; const bySup = {};
+  for (const { o, t: tt } of rows) {
+    extras += tt.extrasPendingBRL;
+    if (tt.pending <= 0.01) continue;
+    pend[tt.cur] += tt.pending;
+    const k = o.supplierId || "sem";
+    bySup[k] = bySup[k] || { id: o.supplierId, name: byId.suppliers[o.supplierId]?.name || "Sem fornecedor", USD: 0, BRL: 0 };
+    bySup[k][tt.cur] += tt.pending;
+  }
+  const rate = curRate?.usdBrl || null;
+  const toBRL = (v) => v.BRL + (convert(v.USD, "USD", "BRL", rate) || 0);
+  const late = open.filter((x) => isLate(x.o));
+  const soon = addDays(t, 15);
+  const arriving = open.filter((x) => x.o.expectedDate && x.o.expectedDate >= t && x.o.expectedDate <= soon).sort((a, b) => (a.o.expectedDate < b.o.expectedDate ? -1 : 1));
+  const attention = rows.filter((x) => x.o.needsReview || x.t.taxAwaiting || x.r.status === "divergencia");
+  const toList = (f) => { setFilters(f); go("pedidos"); };
+  const OList = ({ list, empty, right }) => list.length ? html`<div class="list">${list.slice(0, 12).map((x) => html`
+      <div class="li" key=${x.o.id} style="cursor:pointer" onClick=${() => go("pedido", { id: x.o.id })}>
+        <div style="min-width:0"><div><span class="num">#${x.o.number}</span> <strong>${x.o.title}</strong></div>
+        <div class="small muted">${byId.suppliers[x.o.supplierId]?.name || ""} <${Pill} tone=${ORDER_TONE[x.o.status]}>${ORDER_STATUS[x.o.status]}<//></div></div>
+        <div class="small">${right(x)}</div></div>`)}</div>` : html`<div class="empty">${empty}</div>`;
+
+  if (!D.orders.length) {
+    return html`<${Head} title="Painel" actions=${html`<button class="btn pri" onClick=${() => go("novo")}>+ Novo pedido</button>`} />
+      <${Card} title="Comece por aqui"><p>Nenhum pedido ainda. Cadastre o primeiro pedido e defina a cotação do dólar de hoje; o painel passa a mostrar o que falta pagar, o que está atrasado e o que chega nos próximos dias.</p>
+      <div class="row"><button class="btn pri" onClick=${() => go("novo")}>Cadastrar primeiro pedido</button><button class="btn" onClick=${() => go("dolar")}>Definir cotação</button></div><//>`;
+  }
+  return html`<${Head} title="Painel" actions=${html`<button class="btn pri" onClick=${() => go("novo")}>+ Novo pedido</button>`} />
+    ${!curRate || curRate.id !== t ? html`<button class="banner b-warn" style="border:0;text-align:left;cursor:pointer;font:inherit" onClick=${() => go("dolar")}>A cotação do dólar de hoje ainda não foi definida${curRate ? " (usando a de " + fdate(curRate.id) + ")" : ""}. Toque para definir.</button>` : null}
+    <div class="stats">
+      <${Stat} label="A pagar aos fornecedores" value=${money(toBRL(pend))} sub=${pend.USD > 0 ? [money(pend.USD, "USD"), pend.BRL > 0 ? money(pend.BRL) : null].filter(Boolean).join(" + ") : null} tone=${toBRL(pend) > 0 ? "bad" : "good"} onClick=${() => toList({ pagamento: "em_aberto" })} />
+      <${Stat} label="Pedidos em aberto" value=${open.length} onClick=${() => toList({ status: "abertos" })} />
+      <${Stat} label="Peças a receber" value=${num(open.reduce((s, x) => s + x.r.missing, 0), 0)} onClick=${() => toList({ status: "abertos" })} />
+      <${Stat} label="Pedidos atrasados" value=${late.length} tone=${late.length ? "bad" : null} onClick=${() => toList({ situacao: "atrasados" })} />
+      <${Stat} label="Despesas pendentes" value=${money(extras)} sub=${rows.filter((x) => x.t.taxAwaiting).length + " com imposto a lançar"} tone=${extras > 0 ? "warn" : null} onClick=${() => toList({ situacao: "imposto" })} />
+    </div>
+    <div class="cols2">
+      <${Card} title=${"Atrasados (" + late.length + ")"}><${OList} list=${late} empty="Nenhum pedido atrasado." right=${(x) => html`<span style="color:var(--bad)">Previsto ${fdate(x.o.expectedDate)}</span>`} /><//>
+      <${Card} title=${"Chegando em 15 dias (" + arriving.length + ")"}><${OList} list=${arriving} empty="Nenhuma chegada prevista nos próximos 15 dias." right=${(x) => fdate(x.o.expectedDate)} /><//>
+      <${Card} title="A pagar por fornecedor">${Object.values(bySup).length ? html`<div class="list">${Object.values(bySup).sort((a, b) => toBRL(b) - toBRL(a)).map((s) => html`
+        <div class="li" key=${s.name} style="cursor:pointer" onClick=${() => toList({ fornecedor: s.id || "", pagamento: "em_aberto" })}><strong>${s.name}</strong><span class="tab" style="text-align:right">${s.USD > 0 ? html`<div>${money(s.USD, "USD")}</div>` : null}${s.BRL > 0 ? html`<div>${money(s.BRL)}</div>` : null}</span></div>`)}</div>` : html`<div class="empty">Nenhum saldo a pagar.</div>`}<//>
+      <${Card} title=${"Precisam de atenção (" + attention.length + ")"}><${OList} list=${attention} empty="Nada pendente de revisão." right=${(x) => html`<span class="row" style="justify-content:flex-end">${x.o.needsReview ? html`<${Pill} tone="p-warn">Revisar<//>` : null}${x.t.taxAwaiting ? html`<${Pill} tone="p-acc">Imposto a lançar<//>` : null}${x.r.status === "divergencia" ? html`<${Pill} tone="p-bad">Divergência<//>` : null}</span>`} /><//>
+    </div>`;
+}
+
+// ---------------- Lista de pedidos ----------------
+function filterOrders(D, byId, f) {
+  const q = key(f.q);
+  return D.orders.map((o) => ({ o, t: totals(o), r: receipt(o), late: isLate(o) })).filter(({ o, t, r, late }) => {
+    if (q) {
+      const hay = [o.title, o.notes, byId.suppliers[o.supplierId]?.name, ...(o.trackings || []).map((x) => x.code), ...(o.items || []).map((i) => byId.products[i.productId]?.name)].map(key).join(" | ");
+      if (!hay.includes(q)) return false;
+    }
+    if (f.fornecedor && o.supplierId !== f.fornecedor) return false;
+    if (f.modalidade && o.modeId !== f.modalidade) return false;
+    if (f.transportadora && o.carrierId !== f.transportadora) return false;
+    if (f.status === "abertos" && CLOSED.includes(o.status)) return false;
+    if (f.status && f.status !== "abertos" && o.status !== f.status) return false;
+    if (f.de && (!o.orderDate || o.orderDate < f.de)) return false;
+    if (f.ate && (!o.orderDate || o.orderDate > f.ate)) return false;
+    if (f.pagamento === "em_aberto" && !(t.pending > 0.01)) return false;
+    if (f.pagamento && f.pagamento !== "em_aberto" && t.payStatus !== f.pagamento) return false;
+    if (f.recebimento && r.status !== f.recebimento) return false;
+    if (f.situacao === "atrasados" && !late) return false;
+    if (f.situacao === "revisao" && !o.needsReview) return false;
+    if (f.situacao === "imposto" && !t.taxAwaiting) return false;
+    return true;
+  }).sort((a, b) => (b.o.orderDate || "").localeCompare(a.o.orderDate || "") || (b.o.number || 0) - (a.o.number || 0));
+}
+
+function Pedidos({ ctx }) {
+  const { D, byId, go, filters: f, setFilters } = ctx;
+  const [open, setOpen] = useState(Object.values(f).some(Boolean));
+  const list = filterOrders(D, byId, f);
+  const set = (k, v) => setFilters({ ...f, [k]: v });
+  const pend = { USD: 0, BRL: 0 }; let pieces = 0, extras = 0;
+  for (const x of list) { if (x.t.pending > 0) pend[x.t.cur] += x.t.pending; pieces += x.t.pieces; extras += x.t.extrasPendingBRL; }
+  const has = Object.values(f).some(Boolean);
+  const sel = (k, label, opts) => html`<select value=${f[k] || ""} onChange=${(e) => set(k, e.target.value)} aria-label=${label}><option value="">${label}</option>${opts.map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>`;
+  return html`<${Head} title="Pedidos" actions=${html`<${ExportButton} ctx=${ctx} list=${list} /><button class="btn pri" onClick=${() => go("novo")}>+ Novo pedido</button>`} />
+    <section class="card"><div class="ch" style="cursor:pointer" onClick=${() => setOpen(!open)}><h2>Filtros ${has ? html`<span style="color:var(--accent)">(ativos)</span>` : null}</h2><span class="muted">${open ? "▲" : "▼"}</span></div>
+    ${open ? html`<div class="cb"><div class="grid g3">
+      <input placeholder="Buscar título, produto, fornecedor, rastreio..." value=${f.q || ""} onInput=${(e) => set("q", e.target.value)} />
+      ${sel("fornecedor", "Todos os fornecedores", D.suppliers.map((s) => [s.id, s.name]).sort((a, b) => a[1].localeCompare(b[1])))}
+      ${sel("status", "Todos os status", [["abertos", "Em aberto (não recebidos)"], ...Object.entries(ORDER_STATUS)])}
+      ${sel("modalidade", "Todas as modalidades", D.modes.map((s) => [s.id, s.name]))}
+      ${sel("transportadora", "Todas as transportadoras", D.carriers.map((s) => [s.id, s.name]))}
+      ${sel("pagamento", "Qualquer pagamento", [["em_aberto", "Com saldo a pagar"], ...Object.entries(PAY_LABEL)])}
+      ${sel("recebimento", "Qualquer recebimento", Object.entries(REC_LABEL))}
+      ${sel("situacao", "Qualquer situação", [["atrasados", "Atrasados"], ["revisao", "Precisam de revisão"], ["imposto", "Imposto por fora a lançar"]])}
+      <${Field} label="Pedido de"><input type="date" value=${f.de || ""} onChange=${(e) => set("de", e.target.value)} /><//>
+      <${Field} label="até"><input type="date" value=${f.ate || ""} onChange=${(e) => set("ate", e.target.value)} /><//>
+    </div>${has ? html`<div><button class="btn" onClick=${() => setFilters({})}>Limpar filtros</button></div>` : null}</div>` : null}</section>
+    <div class="stats">
+      <${Stat} label="Pedidos" value=${list.length} />
+      <${Stat} label="Peças" value=${num(pieces, 0)} />
+      <${Stat} label="A pagar aos fornecedores" value=${money(pend.BRL)} sub=${pend.USD > 0 ? money(pend.USD, "USD") : null} tone="bad" />
+      <${Stat} label="Despesas pendentes" value=${money(extras)} tone="warn" />
+    </div>
+    ${list.length === 0 ? html`<div class="card"><div class="empty">${has ? "Nenhum pedido com esses filtros." : "Nenhum pedido cadastrado ainda."}</div></div>` : html`<div class="grid">${list.map(({ o, t, r, late }) => html`
+      <button type="button" key=${o.id} class=${cx("order-card", late && "late")} onClick=${() => go("pedido", { id: o.id })}>
+        <div class="row between" style="align-items:flex-start"><div style="min-width:0"><div><span class="num">#${o.number}</span> <strong>${o.title}</strong></div>
+          <div class="small muted">${[byId.suppliers[o.supplierId]?.name, byId.modes[o.modeId]?.name, "Pedido " + fdate(o.orderDate)].filter(Boolean).join(" · ")} · <span style=${late ? "color:var(--bad);font-weight:600" : ""}>Previsão ${fdate(o.expectedDate)}${late ? " (atrasado)" : ""}</span></div></div>
+          <div style="text-align:right"><div class="tab"><strong>${money(t.supplierTotal, t.cur)}</strong></div>${t.pending > 0.01 ? html`<div class="small tab" style="color:var(--bad)">Falta ${money(t.pending, t.cur)}</div>` : null}</div></div>
+        <div class="row"><${Pill} tone=${ORDER_TONE[o.status]}>${ORDER_STATUS[o.status]}<//><${Pill} tone=${PAY_TONE[t.payStatus]}>${PAY_LABEL[t.payStatus]}<//>${r.status !== "nao_recebido" ? html`<${Pill} tone=${REC_TONE[r.status]}>${REC_LABEL[r.status]}<//>` : null}<${Pill}>${num(t.pieces, 0)} peças<//>
+          ${(o.trackings || []).length ? html`<${Pill}>${o.trackings.filter((x) => x.status === "entregue" || x.received).length}/${o.trackings.length} rastreios entregues<//>` : null}
+          ${t.taxAwaiting ? html`<${Pill} tone="p-acc">Imposto a lançar<//>` : null}${o.needsReview ? html`<${Pill} tone="p-warn">Revisar<//>` : null}</div>
+      </button>`)}</div>`}`;
+}
+
+// ---------------- Exportação Excel e backup ----------------
+let xlsxPromise = null;
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  xlsxPromise = xlsxPromise || new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = rej; document.head.appendChild(s); });
+  return xlsxPromise;
+}
+async function saveFile(filename, data, notify) {
+  const dl = await window.claude?.use?.("downloads");
+  if (!dl) { notify("Download indisponível aqui. Abra pelo claude.ai."); return; }
+  try { await dl.save({ filename, data }); } catch (e) { if (e?.code !== "declined") notify("Não foi possível baixar o arquivo."); }
+}
+function ExportButton({ ctx, list }) {
+  const [busy, setBusy] = useState(false);
+  const { byId } = ctx;
+  async function run() {
+    setBusy(true);
+    try {
+      const X = await loadXlsx();
+      const cur = (c) => (c === "USD" ? "$" : "R$");
+      const P = [], I = [], PG = [], IM = [], R = [];
+      for (const { o, t, r } of list) {
+        const sup = byId.suppliers[o.supplierId]?.name || "";
+        P.push({ "Nº": o.number, "Título": o.title, "Fornecedor": sup, "Data do pedido": fdate(o.orderDate), "Previsão": fdate(o.expectedDate), "Modalidade": byId.modes[o.modeId]?.name || "", "Transportadora": byId.carriers[o.carrierId]?.name || "", "Status": ORDER_STATUS[o.status], "Moeda": cur(o.currency), "Cotação": o.rate || "", "Peças": t.pieces, "Produtos": t.itemsTotal, "Frete": t.freight, "Desconto": t.discount, "Despesas do fornecedor": t.supplierExpenses, "Total ao fornecedor": t.supplierTotal, "Pago": t.paid, "Falta pagar": t.pending, "Pagamento": PAY_LABEL[t.payStatus], "Imposto": TAX_LABEL[o.taxMode], "Imposto (R$)": t.taxTotalBRL, "Imposto/despesas à parte (R$)": t.extrasBRL, "Custo total (R$)": t.landedBRL, "Custo por peça (R$)": t.costPerPiece ? r2(t.costPerPiece) : "", "Recebimento": REC_LABEL[r.status], "Peças recebidas": r.received, "Com defeito": r.defective, "Rastreios": (o.trackings || []).length, "Observações": o.notes || "" });
+        for (const i of o.items || []) I.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Produto": byId.products[i.productId]?.name || "", "Variação": i.variant || "", "Caixas": i.boxes ?? "", "Peças/caixa": i.ppb ?? "", "Grades": i.grids ?? "", "Peças/grade": i.ppg ?? "", "Total de peças": i.pieces, "Valor unitário": i.unitPrice, "Moeda": cur(o.currency), "Total": r2(n0(i.pieces) * n0(i.unitPrice)), "Tamanhos": i.sizes ? Object.entries(i.sizes).map(([s, q]) => s + ": " + q).join(", ") : "", "Recebido": i.receivedQty ?? "", "Com defeito": i.defectiveQty ?? "", "Obs. conferência": i.checkNotes || "" });
+        for (const p of o.payments || []) PG.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Data": fdate(p.date), "Valor": p.amount, "Moeda": cur(p.currency), "Cotação": p.rate || "", "Valor em R$": r2(convert(p.amount, p.currency, "BRL", p.rate || t.orate) || 0), "Forma de pagamento": byId.methods[p.methodId]?.name || "", "Observação": p.notes || "" });
+        for (const x of o.taxPayments || []) IM.push({ "Nº pedido": o.number, "Pedido": o.title, "Data": fdate(x.date), "Valor": x.amount, "Moeda": cur(x.currency), "Cotação": x.rate || "", "Pacote": (o.trackings || []).find((k) => k.id === x.trackingId)?.code || "Pedido todo", "Observação": x.notes || "" });
+        for (const k of o.trackings || []) R.push({ "Nº pedido": o.number, "Pedido": o.title, "Código": k.code, "Conteúdo": k.label || "", "Transportadora": byId.carriers[k.carrierId]?.name || "", "Status": TRK_STATUS[k.status], "Recebido": k.received ? "Sim" : "Não", "Data recebimento": fdate(k.receivedDate), "Observação": k.notes || "" });
+      }
+      const wb = X.utils.book_new();
+      for (const [name, rows] of [["Pedidos", P], ["Itens", I], ["Pagamentos", PG], ["Impostos", IM], ["Rastreios", R]]) X.utils.book_append_sheet(wb, X.utils.json_to_sheet(rows.length ? rows : [{ "": "Sem dados" }]), name);
+      const buf = X.write(wb, { type: "array", bookType: "xlsx" });
+      await saveFile("pedidos-" + today() + ".xlsx", buf, ctx.notify);
+    } catch (e) { console.error(e); ctx.notify("Não foi possível gerar o Excel."); }
+    setBusy(false);
+  }
+  return html`<button class="btn" disabled=${busy} onClick=${run}>${busy ? "Gerando…" : "⬇ Excel"}</button>`;
+}
+
+// ---------------- Formulário do pedido ----------------
+const emptyItem = () => ({ id: uid(), product: "", variant: "", boxes: "", ppb: "", grids: "", ppg: "12", pieces: "", unitPrice: "", sizes: null, auto: true });
+function suggested(i) {
+  const b = parseDec(i.boxes), pb = parseDec(i.ppb), g = parseDec(i.grids), pg = parseDec(i.ppg);
+  if (b && pb) return Math.round(b * pb);
+  if (g && pg) return Math.round(g * pg);
+  return null;
+}
+function OrderForm({ ctx, id }) {
+  const { D, byId, api, go, notify, today: t } = ctx;
+  const existing = id ? D.orders.find((o) => o.id === id) : null;
+  const [f, setF] = useState(() => existing ? {
+    title: existing.title || "", supplier: byId.suppliers[existing.supplierId]?.name || "", orderDate: existing.orderDate || "", expectedDate: existing.expectedDate || "",
+    mode: byId.modes[existing.modeId]?.name || "", carrier: byId.carriers[existing.carrierId]?.name || "", currency: existing.currency || "BRL", rate: toInput(existing.rate),
+    freight: toInput(existing.freight), discount: toInput(existing.discount), taxMode: existing.taxMode || "sem", taxAmount: existing.taxMode === "incluso" && existing.taxAmount ? toInput(existing.taxAmount) : "",
+    status: existing.status || "confirmado", notes: existing.notes || "", needsReview: !!existing.needsReview,
+  } : { title: "", supplier: "", orderDate: t, expectedDate: "", mode: "", carrier: "", currency: "BRL", rate: toInput(rateFor(D.rates, t)?.usdBrl), freight: "", discount: "", taxMode: "sem", taxAmount: "", status: "confirmado", notes: "", needsReview: false });
+  const [items, setItems] = useState(() => existing && existing.items?.length ? existing.items.map((i) => ({
+    ...i, product: byId.products[i.productId]?.name || "", boxes: toInput(i.boxes), ppb: toInput(i.ppb), grids: toInput(i.grids), ppg: toInput(i.ppg), pieces: String(i.pieces ?? ""), unitPrice: toInput(i.unitPrice),
+    sizes: i.sizes ? Object.entries(i.sizes).map(([size, q]) => ({ size, qty: String(q) })) : null, auto: false,
+  })) : [emptyItem()]);
+  const [expenses, setExpenses] = useState(() => (existing?.expenses || []).map((e) => ({ ...e, amount: toInput(e.amount) })));
+  const [rateTouched, setRateTouched] = useState(!!existing?.rate);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const cur = f.currency;
+
+  if (id && !existing) return html`<${Head} title="Pedido não encontrado" back=${() => go("pedidos")} />`;
+
+  function upItem(iid, patch) {
+    setItems((l) => l.map((i) => {
+      if (i.id !== iid) return i;
+      const n = { ...i, ...patch };
+      if ("pieces" in patch) n.auto = patch.pieces === "";
+      if (n.auto && !("pieces" in patch)) { const s = suggested(n); if (s !== null) n.pieces = String(s); }
+      return n;
+    }));
+  }
+  function onDate(v) {
+    set("orderDate", v);
+    if (v && !rateTouched) { const r = rateFor(D.rates, v); if (r) set("rate", toInput(r.usdBrl)); }
+    suggestExpected(v, f.mode);
+  }
+  function suggestExpected(date, modeName) {
+    const m = D.modes.find((x) => key(x.name) === key(modeName));
+    if (date && m?.defaultDays && !f.expectedDate) set("expectedDate", addDays(date, m.defaultDays));
+  }
+  const tot = totals({
+    currency: cur, rate: parseDec(f.rate), freight: parseDec(f.freight), discount: parseDec(f.discount), taxMode: f.taxMode, taxAmount: parseDec(f.taxAmount),
+    items: items.map((i) => ({ pieces: parseDec(i.pieces) || 0, unitPrice: parseDec(i.unitPrice) || 0 })),
+    expenses: expenses.map((e) => ({ amount: parseDec(e.amount) || 0, currency: e.currency, chargedBySupplier: e.chargedBySupplier, paid: e.paid })), payments: [], taxPayments: [],
+  });
+
+  async function save() {
+    setErr(null);
+    if (!norm(f.title)) return setErr("Informe o título do pedido.");
+    if (items.some((i) => !norm(i.product))) return setErr("Informe o produto de todos os itens.");
+    if (expenses.some((e) => !norm(e.description))) return setErr("Informe a descrição de todas as despesas.");
+    const rate = parseDec(f.rate);
+    if ((cur === "USD" || expenses.some((e) => e.currency !== cur)) && !rate) return setErr("Informe a cotação do dólar do pedido.");
+    setBusy(true);
+    try {
+      const supplierId = await resolveName(api, D.suppliers, "suppliers", f.supplier);
+      const modeId = await resolveName(api, D.modes, "modes", f.mode);
+      const carrierId = await resolveName(api, D.carriers, "carriers", f.carrier);
+      const prodIds = {};
+      for (const i of items) { const k = key(i.product); if (!prodIds[k]) prodIds[k] = await resolveName(api, D.products.concat(Object.entries(prodIds).map(([kk, v]) => ({ id: v, name: kk }))), "products", i.product); }
+      const oid = existing ? existing.id : uid();
+      const now = new Date().toISOString();
+      const body = {
+        ...(existing || {}),
+        number: existing ? existing.number : Math.max(0, ...D.orders.map((o) => o.number || 0)) + 1,
+        title: norm(f.title), supplierId, orderDate: f.orderDate || null, expectedDate: f.expectedDate || null, modeId, carrierId,
+        currency: cur, rate: rate || null, freight: parseDec(f.freight) || 0, discount: parseDec(f.discount) || 0,
+        taxMode: f.taxMode, taxAmount: f.taxMode === "incluso" ? parseDec(f.taxAmount) || 0 : 0, status: f.status, notes: f.notes.trim() || null, needsReview: f.needsReview,
+        items: items.map((i) => {
+          let sizes = null;
+          if (i.sizes?.length) { sizes = {}; for (const s of i.sizes) { const q = parseDec(s.qty); if (s.size && q) sizes[s.size] = (sizes[s.size] || 0) + Math.round(q); } if (!Object.keys(sizes).length) sizes = null; }
+          const old = existing?.items?.find((x) => x.id === i.id) || {};
+          return { id: i.id, productId: prodIds[key(i.product)], variant: norm(i.variant) || null, boxes: parseDec(i.boxes), ppb: parseDec(i.ppb), grids: parseDec(i.grids), ppg: parseDec(i.ppg), pieces: Math.round(parseDec(i.pieces) || 0), unitPrice: parseDec(i.unitPrice) || 0, sizes,
+            receivedQty: old.receivedQty ?? null, defectiveQty: old.defectiveQty ?? null, checkNotes: old.checkNotes ?? null, receivedSizes: old.receivedSizes ?? null };
+        }),
+        expenses: expenses.map((e) => ({ id: e.id, description: norm(e.description), amount: parseDec(e.amount) || 0, currency: e.currency, chargedBySupplier: !!e.chargedBySupplier, paid: e.chargedBySupplier ? false : !!e.paid })),
+        payments: existing?.payments || [], taxPayments: existing?.taxPayments || [], trackings: existing?.trackings || [],
+        createdAt: existing?.createdAt || now, updatedAt: now,
+      };
+      delete body.id;
+      await api.saveOrder(oid, body);
+      notify("Pedido salvo.");
+      go("pedido", { id: oid });
+    } catch (e) { console.error(e); setErr(e?.code === "quota_exceeded" ? "O banco do app está cheio. Exclua pedidos antigos." : "Não foi possível salvar. Tente de novo."); }
+    setBusy(false);
+  }
+
+  return html`
+    <datalist id="dl-sup">${D.suppliers.map((s) => html`<option key=${s.id} value=${s.name} />`)}</datalist>
+    <datalist id="dl-prod">${D.products.map((s) => html`<option key=${s.id} value=${s.name} />`)}</datalist>
+    <datalist id="dl-mode">${D.modes.map((s) => html`<option key=${s.id} value=${s.name} />`)}</datalist>
+    <datalist id="dl-car">${D.carriers.map((s) => html`<option key=${s.id} value=${s.name} />`)}</datalist>
+    <datalist id="dl-var">${VARIANTS.map((v) => html`<option key=${v} value=${v} />`)}</datalist>
+    <datalist id="dl-size">${SIZES.map((v) => html`<option key=${v} value=${v} />`)}</datalist>
+    <${Head} title=${existing ? "Editar pedido #" + existing.number : "Novo pedido"} back=${() => (existing ? go("pedido", { id }) : go("pedidos"))} />
+    <${Card} title="Dados do pedido"><div class="grid g3">
+      <${Field} label="Título do pedido" className="span-all"><input id="f-title" value=${f.title} onInput=${(e) => set("title", e.target.value)} placeholder="Ex.: Pedido Joao ATK - Aéreo Diversos" /><//>
+      <${Field} label="Fornecedor" hint="Digite um nome novo para cadastrar na hora."><input id="f-sup" list="dl-sup" value=${f.supplier} onInput=${(e) => set("supplier", e.target.value)} /><//>
+      <${Field} label="Status do pedido"><select id="f-status" value=${f.status} onChange=${(e) => set("status", e.target.value)}>${Object.entries(ORDER_STATUS).map(([k, l]) => html`<option key=${k} value=${k}>${l}</option>`)}</select><//>
+      <${Field} label="Data do pedido"><input id="f-date" type="date" value=${f.orderDate} onChange=${(e) => onDate(e.target.value)} /><//>
+      <${Field} label="Modalidade de transporte"><input id="f-mode" list="dl-mode" value=${f.mode} onInput=${(e) => set("mode", e.target.value)} onBlur=${(e) => suggestExpected(f.orderDate, e.target.value)} placeholder="Aéreo, Marítimo..." /><//>
+      <${Field} label="Transportadora"><input id="f-car" list="dl-car" value=${f.carrier} onInput=${(e) => set("carrier", e.target.value)} placeholder="Correios - Sedex, Fedex..." /><//>
+      <${Field} label="Previsão de recebimento"><input id="f-exp" type="date" value=${f.expectedDate} onChange=${(e) => set("expectedDate", e.target.value)} /><//>
+      <${Field} label="Moeda do pedido"><select id="f-cur" value=${cur} onChange=${(e) => set("currency", e.target.value)}><option value="BRL">Real (R$)</option><option value="USD">Dólar ($)</option></select><//>
+      <${Field} label="Cotação do pedido ($1 = R$)" hint="Sugerida pela cotação do dia do pedido."><input id="f-rate" inputmode="decimal" value=${f.rate} onInput=${(e) => { setRateTouched(true); set("rate", e.target.value); }} placeholder="5,42" /><//>
+    </div><//>
+
+    <${Card} title=${"Itens (" + items.length + ")"} actions=${html`<button class="btn" onClick=${() => setItems((l) => [...l, emptyItem()])}>+ Item</button>`}>
+      ${items.map((i, idx) => {
+        const s = suggested(i), tp = parseDec(i.pieces) || 0, sum = i.sizes ? i.sizes.reduce((a, x) => a + (parseDec(x.qty) || 0), 0) : 0;
+        return html`<div class="itembox" key=${i.id}>
+          <div class="row between"><strong class="small muted">ITEM ${idx + 1}</strong>${items.length > 1 ? html`<button class="link" style="color:var(--bad)" onClick=${() => setItems((l) => l.filter((x) => x.id !== i.id))}>Remover</button>` : null}</div>
+          <div class="grid g2">
+            <${Field} label="Produto"><input id=${"p-" + i.id} list="dl-prod" value=${i.product} onInput=${(e) => upItem(i.id, { product: e.target.value })} placeholder="Digite ou escolha" /><//>
+            <${Field} label="Variação"><input id=${"v-" + i.id} list="dl-var" value=${i.variant || ""} onInput=${(e) => upItem(i.id, { variant: e.target.value })} /><//>
+            <${Field} label="Caixas"><input id=${"b-" + i.id} inputmode="decimal" value=${i.boxes} onInput=${(e) => upItem(i.id, { boxes: e.target.value })} /><//>
+            <${Field} label="Peças/caixa"><input id=${"pb-" + i.id} inputmode="decimal" value=${i.ppb} onInput=${(e) => upItem(i.id, { ppb: e.target.value })} /><//>
+            <${Field} label="Grades"><input id=${"g-" + i.id} inputmode="decimal" value=${i.grids} onInput=${(e) => upItem(i.id, { grids: e.target.value })} /><//>
+            <${Field} label="Peças/grade"><input id=${"pg-" + i.id} inputmode="decimal" value=${i.ppg} onInput=${(e) => upItem(i.id, { ppg: e.target.value })} /><//>
+            <${Field} label="Total de peças" hint=${s !== null && s !== tp ? html`<button class="link" onClick=${(e) => { e.preventDefault(); upItem(i.id, { pieces: String(s) }); }}>Calculado: ${s}. Usar</button>` : null}><input id=${"t-" + i.id} inputmode="numeric" value=${i.pieces} onInput=${(e) => upItem(i.id, { pieces: e.target.value })} style="font-weight:600" /><//>
+            <${Field} label=${"Valor unit. (" + (cur === "USD" ? "$" : "R$") + ")"}><input id=${"u-" + i.id} inputmode="decimal" value=${i.unitPrice} onInput=${(e) => upItem(i.id, { unitPrice: e.target.value })} /><//>
+          </div>
+          <div class="row between"><button class="link" onClick=${() => upItem(i.id, { sizes: i.sizes ? null : ["P", "M", "G", "GG", "XGG"].map((size) => ({ size, qty: "" })) })}>${i.sizes ? "Não controlar tamanhos" : "Controlar tamanhos (opcional)"}</button><strong class="tab">Total: ${money(tp * (parseDec(i.unitPrice) || 0), cur)}</strong></div>
+          ${i.sizes ? html`<div class="sizes">${i.sizes.map((sz, k) => html`<div class="sz" key=${k}>
+              <input list="dl-size" value=${sz.size} aria-label="Tamanho" onInput=${(e) => upItem(i.id, { sizes: i.sizes.map((x, j) => (j === k ? { ...x, size: e.target.value } : x)) })} />
+              <input inputmode="numeric" placeholder="qtd" value=${sz.qty} aria-label="Quantidade" onInput=${(e) => upItem(i.id, { sizes: i.sizes.map((x, j) => (j === k ? { ...x, qty: e.target.value } : x)) })} /></div>`)}
+            <button class="btn sm" onClick=${() => upItem(i.id, { sizes: [...i.sizes, { size: "", qty: "" }] })}>+ tamanho</button>
+            <div class="small" style=${"width:100%;" + (sum && sum !== tp ? "color:var(--warn)" : "")}>Soma dos tamanhos: ${sum}${sum > 0 && sum !== tp ? html` (diferente do total de ${tp}). <button class="link" onClick=${() => upItem(i.id, { pieces: String(sum) })}>Usar soma como total</button>` : null}</div></div>` : null}
+        </div>`;
+      })}
+      <button class="btn" onClick=${() => setItems((l) => [...l, emptyItem()])}>+ Adicionar item</button>
+    <//>
+
+    <${Card} title="Frete, desconto e imposto">
+      <div class="grid g2">
+        <${Field} label=${"Frete (" + cur + ")"}><input id="f-fr" inputmode="decimal" value=${f.freight} onInput=${(e) => set("freight", e.target.value)} /><//>
+        <${Field} label=${"Desconto (" + cur + ")"}><input id="f-ds" inputmode="decimal" value=${f.discount} onInput=${(e) => set("discount", e.target.value)} /><//>
+      </div>
+      <div class="radios">${Object.keys(TAX_LABEL).map((m) => html`<label key=${m} class=${cx("radio", f.taxMode === m && "on")}><input type="radio" name="taxMode" checked=${f.taxMode === m} onChange=${() => set("taxMode", m)} /><span><strong>${TAX_LABEL[m]}</strong><div class="small muted">${TAX_HINT[m]}</div></span></label>`)}</div>
+      ${f.taxMode === "incluso" ? html`<${Field} label=${"Valor do imposto incluso (" + cur + ") — opcional"}><input id="f-tx" inputmode="decimal" value=${f.taxAmount} onInput=${(e) => set("taxAmount", e.target.value)} /><//>` : null}
+    <//>
+
+    <${Card} title="Outras despesas" actions=${html`<button class="btn" onClick=${() => setExpenses((l) => [...l, { id: uid(), description: "", amount: "", currency: cur, chargedBySupplier: true, paid: false }])}>+ Despesa</button>`}>
+      ${expenses.length === 0 ? html`<p class="muted small" style="margin:0">Taxas, envio interno, despachante etc. Nenhuma despesa lançada.</p>` : expenses.map((e) => html`<div class="itembox" key=${e.id}>
+        <div class="grid g2">
+          <${Field} label="Descrição"><input value=${e.description} onInput=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, description: ev.target.value } : x)))} /><//>
+          <${Field} label="Valor"><input inputmode="decimal" value=${e.amount} onInput=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, amount: ev.target.value } : x)))} /><//>
+          <${Field} label="Moeda"><select value=${e.currency} onChange=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, currency: ev.target.value } : x)))}><option value="BRL">R$</option><option value="USD">$</option></select><//>
+        </div>
+        <div class="row between"><div class="row">
+          <label class="chk"><input type="checkbox" checked=${e.chargedBySupplier} onChange=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, chargedBySupplier: ev.target.checked } : x)))} />Cobrada pelo fornecedor</label>
+          ${!e.chargedBySupplier ? html`<label class="chk"><input type="checkbox" checked=${e.paid} onChange=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, paid: ev.target.checked } : x)))} />Já paga</label>` : null}</div>
+          <button class="link" style="color:var(--bad)" onClick=${() => setExpenses((l) => l.filter((x) => x.id !== e.id))}>Remover</button></div>
+      </div>`)}
+    <//>
+
+    <${Card} title="Observações">
+      <textarea id="f-notes" rows="3" value=${f.notes} onInput=${(e) => set("notes", e.target.value)}></textarea>
+      <label class="chk"><input type="checkbox" checked=${f.needsReview} onChange=${(e) => set("needsReview", e.target.checked)} />Marcar como "precisa de revisão"</label>
+    <//>
+
+    <div class="sticky-foot">
+      <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
+        <div><div class="small muted">Peças</div><strong class="tab">${num(tot.pieces, 0)}</strong></div>
+        <div><div class="small muted">Produtos</div><strong class="tab">${money(tot.itemsTotal, cur)}</strong></div>
+        <div><div class="small muted">Total ao fornecedor</div><strong class="tab" style="color:var(--accent)">${money(tot.supplierTotal, cur)}</strong><div class="small muted">${other(tot.supplierTotal, cur, tot.orate) || ""}</div></div>
+        <div><div class="small muted">Despesas à parte</div><strong class="tab">${money(tot.extrasBRL)}</strong></div>
+      </div>
+      ${err ? html`<div class="banner b-bad">${err}</div>` : null}
+      <div class="row"><button class="btn pri" disabled=${busy || !ctx.canWrite} onClick=${save}>${busy ? "Salvando…" : "Salvar pedido"}</button><button class="btn" onClick=${() => (existing ? go("pedido", { id }) : go("pedidos"))}>Cancelar</button></div>
+    </div>`;
+}
+
+// ---------------- Detalhe do pedido ----------------
+function OrderDetail({ ctx, id }) {
+  const { D, byId, api, go, notify, isAdmin, canWrite, today: t, curRate } = ctx;
+  const o = D.orders.find((x) => x.id === id);
+  if (!o) return html`<${Head} title="Pedido não encontrado" back=${() => go("pedidos")} /><div class="card"><div class="empty">${ctx.st.loaded.orders ? "Esse pedido foi excluído ou não existe." : "Carregando…"}</div></div>`;
+  const tt = totals(o), r = receipt(o), cur = tt.cur, late = isLate(o);
+  const patch = async (p, msg) => { try { await api.patchOrder(o.id, p); if (msg) notify(msg); } catch (e) { console.error(e); notify("Não foi possível salvar. Tente de novo."); } };
+  const Info = ({ l, v, bad }) => html`<div><div class="small muted">${l}</div><div style=${bad ? "color:var(--bad);font-weight:600" : "font-weight:500"}>${v || "—"}</div></div>`;
+
+  return html`
+    <${Head} title=${html`<span class="num">#${o.number}</span> ${o.title}`} back=${() => go("pedidos")} actions=${html`${canWrite ? html`<button class="btn pri" onClick=${() => go("editar", { id: o.id })}>Editar pedido</button>` : null}${isAdmin ? html`<${Confirm} question="Excluir o pedido com tudo?" onConfirm=${async () => { await api.deleteOrder(o.id); notify("Pedido excluído."); go("pedidos"); }} />` : null}`} />
+    <div class="row"><${Pill} tone=${ORDER_TONE[o.status]}>${ORDER_STATUS[o.status]}<//><${Pill} tone=${PAY_TONE[tt.payStatus]}>${PAY_LABEL[tt.payStatus]}<//><${Pill} tone=${REC_TONE[r.status]}>${REC_LABEL[r.status]}<//>${late ? html`<${Pill} tone="p-bad">Atrasado<//>` : null}${o.needsReview ? html`<${Pill} tone="p-warn">Precisa de revisão<//>` : null}</div>
+    ${o.needsReview ? html`<div class="banner b-warn row between"><span>Este pedido foi marcado para revisão. Confira os dados.</span>${canWrite ? html`<button class="btn sm" onClick=${() => patch({ needsReview: false }, "Marcado como revisado.")}>Marcar como revisado</button>` : null}</div>` : null}
+    ${tt.missingRate ? html`<div class="banner b-warn">Há valores em outra moeda sem cotação. Edite o pedido e informe a cotação.</div>` : null}
+
+    <${Card} title="Resumo"><div class="grid g2">
+      <${Info} l="Fornecedor" v=${byId.suppliers[o.supplierId]?.name} /><${Info} l="Data do pedido" v=${fdate(o.orderDate)} /><${Info} l="Previsão" v=${fdate(o.expectedDate)} bad=${late} />
+      <${Info} l="Modalidade" v=${byId.modes[o.modeId]?.name} /><${Info} l="Transportadora" v=${byId.carriers[o.carrierId]?.name} /><${Info} l="Moeda" v=${cur === "USD" ? "Dólar ($)" : "Real (R$)"} />
+      <${Info} l="Cotação do pedido" v=${tt.orate ? money(tt.orate) : "—"} /><${Info} l="Total de peças" v=${num(tt.pieces, 0)} />
+    </div>
+    ${canWrite ? html`<div class="row"><${Field} label="Status do pedido"><select value=${o.status} onChange=${(e) => patch({ status: e.target.value }, "Status atualizado.")}>${Object.entries(ORDER_STATUS).map(([k, l]) => html`<option key=${k} value=${k}>${l}</option>`)}</select><//></div>` : null}
+    ${o.notes ? html`<div class="banner" style="background:var(--surface-2);white-space:pre-wrap">${o.notes}</div>` : null}<//>
+
+    <${Card} title="Financeiro">
+      <div class="stats">
+        <${Stat} label="Total ao fornecedor" value=${money(tt.supplierTotal, cur)} sub=${other(tt.supplierTotal, cur, tt.orate)} />
+        <${Stat} label="Já pago" value=${money(tt.paid, cur)} sub=${money(tt.paidBRL) + " efetivos"} tone="good" />
+        <${Stat} label="Falta pagar" value=${money(Math.max(tt.pending, 0), cur)} sub=${tt.pending < 0 ? "Pago a mais: " + money(-tt.pending, cur) : other(Math.max(tt.pending, 0), cur, tt.orate)} tone=${tt.pending > 0.01 ? "bad" : "good"} />
+        <${Stat} label="Imposto e despesas à parte" value=${money(tt.extrasBRL)} sub=${tt.extrasPendingBRL > 0 ? "Despesas pendentes: " + money(tt.extrasPendingBRL) : tt.taxAwaiting ? "Imposto por fora ainda não lançado" : "Nada pendente"} tone=${tt.extrasPendingBRL > 0 || tt.taxAwaiting ? "warn" : null} />
+        <${Stat} label="Imposto" value=${o.taxMode === "sem" && tt.taxTotalBRL === 0 ? "Sem imposto" : money(tt.taxTotalBRL)} sub=${TAX_LABEL[o.taxMode]} />
+        <${Stat} label="Custo total estimado" value=${money(tt.landedBRL)} sub="Pagamentos + saldo + à parte" />
+        <${Stat} label="Custo real por peça" value=${tt.costPerPiece !== null ? money(tt.costPerPiece) : "—"} sub="Com frete, imposto e despesas" />
+      </div>
+      <table class="tab"><tbody>
+        <tr><td>Produtos</td><td class="r">${money(tt.itemsTotal, cur)}</td></tr><tr><td>Frete</td><td class="r">${money(tt.freight, cur)}</td></tr>
+        <tr><td>Desconto</td><td class="r">− ${money(tt.discount, cur)}</td></tr>${tt.supplierExpenses > 0 ? html`<tr><td>Despesas cobradas pelo fornecedor</td><td class="r">${money(tt.supplierExpenses, cur)}</td></tr>` : null}
+        <tr><td><strong>Total ao fornecedor</strong></td><td class="r"><strong>${money(tt.supplierTotal, cur)}</strong></td></tr></tbody></table>
+      ${(o.expenses || []).length ? html`<div><div class="small muted" style="font-weight:600;margin-bottom:4px">OUTRAS DESPESAS</div><div class="list">${o.expenses.map((e) => html`<div class="li" key=${e.id}>
+        <span>${e.description} <span class="small muted">${e.chargedBySupplier ? "(cobrada pelo fornecedor)" : e.paid ? "(paga)" : "(pendente)"}</span></span>
+        <span class="row"><strong class="tab">${money(e.amount, e.currency)}</strong>${!e.chargedBySupplier && canWrite ? html`<button class="btn sm" onClick=${() => patch({ expenses: o.expenses.map((x) => (x.id === e.id ? { ...x, paid: !x.paid } : x)) })}>${e.paid ? "Desmarcar pago" : "Marcar pago"}</button>` : null}</span></div>`)}</div></div>` : null}
+    <//>
+
+    <${Payments} ctx=${ctx} o=${o} tt=${tt} patch=${patch} />
+    <${Taxes} ctx=${ctx} o=${o} tt=${tt} patch=${patch} />
+
+    <${Card} title=${"Itens (" + (o.items || []).length + ")"}>
+      <div class="tablewrap"><table><thead><tr><th>Produto</th><th class="r">Caixas</th><th class="r">Grades</th><th class="r">Peças</th><th class="r">Receb.</th><th class="r">Unit.</th><th class="r">Total</th></tr></thead><tbody>
+      ${(o.items || []).map((i) => html`<tr key=${i.id}><td><strong>${byId.products[i.productId]?.name || "—"}</strong><div class="small muted">${[i.variant, i.ppb ? num(i.ppb) + "/caixa" : null, i.grids && i.ppg ? num(i.ppg) + "/grade" : null].filter(Boolean).join(" · ")}</div>
+        ${i.sizes ? html`<div class="row" style="margin-top:4px">${Object.entries(i.sizes).map(([s, q]) => html`<${Pill} key=${s}>${s}: ${q}<//>`)}</div>` : null}</td>
+        <td class="r">${i.boxes ? num(i.boxes) : "—"}</td><td class="r">${i.grids ? num(i.grids) : "—"}</td><td class="r"><strong>${num(i.pieces, 0)}</strong></td>
+        <td class="r" style=${i.receivedQty == null ? "color:var(--muted)" : i.receivedQty === i.pieces && !i.defectiveQty ? "color:var(--good)" : "color:var(--warn)"}>${i.receivedQty == null ? "—" : num(i.receivedQty, 0)}${i.defectiveQty ? html`<div class="small" style="color:var(--bad)">${i.defectiveQty} def.</div>` : null}</td>
+        <td class="r">${money(i.unitPrice, cur)}</td><td class="r"><strong>${money(n0(i.pieces) * n0(i.unitPrice), cur)}</strong></td></tr>`)}
+      <tr><td><strong>Total</strong></td><td></td><td></td><td class="r"><strong>${num(tt.pieces, 0)}</strong></td><td class="r">${r.received ? num(r.received, 0) : "—"}</td><td></td><td class="r"><strong>${money(tt.itemsTotal, cur)}</strong></td></tr>
+      </tbody></table></div>
+    <//>
+
+    <${Card} title="Recebimento" actions=${canWrite ? html`<button class="btn pri" onClick=${() => go("conferencia", { id: o.id })}>Conferir recebimento</button>` : null}>
+      <div class="stats">
+        <${Stat} label="Situação" value=${REC_LABEL[r.status]} /><${Stat} label="Peças esperadas" value=${num(r.expected, 0)} />
+        <${Stat} label="Peças recebidas" value=${num(r.received, 0)} tone=${r.received === 0 ? null : r.received < r.expected ? "warn" : "good"} />
+        <${Stat} label="Faltando" value=${num(r.missing, 0)} tone=${r.missing > 0 && r.received > 0 ? "warn" : null} /><${Stat} label="Com defeito" value=${num(r.defective, 0)} tone=${r.defective > 0 ? "bad" : null} />
+      </div>
+      ${r.pt ? html`<div class="small muted">Pacotes recebidos: ${r.pk} de ${r.pt}</div>` : null}
+      ${(o.items || []).filter((i) => i.checkNotes).map((i) => html`<div class="banner b-warn" key=${i.id}><strong>${byId.products[i.productId]?.name}:</strong> ${i.checkNotes}</div>`)}
+    <//>
+
+    <${Trackings} ctx=${ctx} o=${o} patch=${patch} />`;
+}
+
+function Payments({ ctx, o, tt, patch }) {
+  const { D, byId, api, isAdmin, canWrite, today: t, notify } = ctx;
+  const [date, setDate] = useState(t);
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState(o.currency);
+  const [rate, setRate] = useState(toInput(rateFor(D.rates, t)?.usdBrl ?? o.rate));
+  const [method, setMethod] = useState("");
+  const [notes, setNotes] = useState("");
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  async function add() {
+    setErr(null);
+    const a = parseDec(amount), r = parseDec(rate);
+    if (!date) return setErr("Informe a data.");
+    if (!a || a <= 0) return setErr("Informe o valor pago.");
+    if (currency !== o.currency && !r) return setErr("Informe a cotação usada neste pagamento.");
+    setBusy(true);
+    try {
+      const methodId = await resolveName(api, D.methods, "methods", method);
+      await api.patchOrder(o.id, { payments: [...(o.payments || []), { id: uid(), date, amount: a, currency, rate: r || null, methodId, notes: notes.trim() || null }] });
+      setAmount(""); setNotes(""); notify("Pagamento lançado.");
+    } catch (e) { console.error(e); setErr("Não foi possível lançar. Tente de novo."); }
+    setBusy(false);
+  }
+  const pays = [...(o.payments || [])].sort((a, b) => (a.date < b.date ? -1 : 1));
+  return html`<${Card} title=${"Pagamentos ao fornecedor (" + pays.length + ")"}>
+    ${pays.length === 0 ? html`<div class="empty">Nenhum pagamento lançado.</div>` : html`<div class="list">${pays.map((p) => {
+      const inOrder = convert(p.amount, p.currency, o.currency, p.rate || tt.orate);
+      return html`<div class="li" key=${p.id}><div><strong class="tab">${fdate(p.date)} · ${money(p.amount, p.currency)}</strong>${p.currency !== o.currency && inOrder !== null ? html` <span class="muted">(${money(inOrder, o.currency)})</span>` : null}
+        <div class="small muted">${[byId.methods[p.methodId]?.name, p.rate ? "cotação " + money(p.rate) : null, p.notes].filter(Boolean).join(" · ")}</div></div>
+        ${isAdmin ? html`<${Confirm} small onConfirm=${() => patch({ payments: o.payments.filter((x) => x.id !== p.id) }, "Pagamento excluído.")} />` : null}</div>`;
+    })}</div>`}
+    ${canWrite ? html`<div style="background:var(--surface-2);border-radius:8px;padding:12px;display:grid;gap:10px">
+      <strong>Lançar pagamento</strong>
+      <datalist id="dl-met">${D.methods.map((m) => html`<option key=${m.id} value=${m.name} />`)}</datalist>
+      <div class="grid g2">
+        <${Field} label="Data"><input type="date" value=${date} onChange=${(e) => { setDate(e.target.value); const rr = rateFor(D.rates, e.target.value); if (rr) setRate(toInput(rr.usdBrl)); }} /><//>
+        <${Field} label="Valor pago"><input inputmode="decimal" value=${amount} placeholder=${tt.pending > 0 ? toInput(tt.pending) : ""} onInput=${(e) => setAmount(e.target.value)} /><//>
+        <${Field} label="Moeda"><select value=${currency} onChange=${(e) => setCurrency(e.target.value)}><option value="BRL">R$</option><option value="USD">$</option></select><//>
+        <${Field} label="Cotação ($1 = R$)"><input inputmode="decimal" value=${rate} onInput=${(e) => setRate(e.target.value)} /><//>
+        <${Field} label="Forma de pagamento"><input list="dl-met" value=${method} onInput=${(e) => setMethod(e.target.value)} placeholder="PIX, Wise..." /><//>
+        <${Field} label="Observação"><input value=${notes} onInput=${(e) => setNotes(e.target.value)} /><//>
+      </div>
+      ${err ? html`<div class="err">${err}</div>` : null}
+      <div><button class="btn pri" disabled=${busy} onClick=${add}>${busy ? "Lançando…" : "Lançar pagamento"}</button></div></div>` : null}
+  <//>`;
+}
+
+function Taxes({ ctx, o, tt, patch }) {
+  const { D, isAdmin, canWrite, today: t, notify, api } = ctx;
+  const [open, setOpen] = useState(tt.taxAwaiting);
+  const [date, setDate] = useState(t);
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState("BRL");
+  const [rate, setRate] = useState(toInput(rateFor(D.rates, t)?.usdBrl));
+  const [trk, setTrk] = useState("");
+  const [notes, setNotes] = useState("");
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  async function add() {
+    setErr(null);
+    const a = parseDec(amount), r = parseDec(rate);
+    if (!a || a <= 0) return setErr("Informe o valor do imposto pago.");
+    if (currency === "USD" && !r) return setErr("Informe a cotação para converter em reais.");
+    setBusy(true);
+    try {
+      await api.patchOrder(o.id, { taxMode: o.taxMode === "sem" ? "por_fora" : o.taxMode, taxPayments: [...(o.taxPayments || []), { id: uid(), date, amount: a, currency, rate: currency === "USD" ? r : null, trackingId: trk || null, notes: notes.trim() || null }] });
+      setAmount(""); setNotes(""); notify("Imposto lançado.");
+    } catch (e) { console.error(e); setErr("Não foi possível lançar. Tente de novo."); }
+    setBusy(false);
+  }
+  const list = o.taxPayments || [];
+  return html`<${Card} title="Imposto">
+    <div><strong>${TAX_LABEL[o.taxMode]}</strong> <span class="muted">— ${TAX_HINT[o.taxMode]}</span></div>
+    ${o.taxMode === "incluso" && o.taxAmount > 0 ? html`<div>Valor incluso: <strong>${money(o.taxAmount, o.currency)}</strong> <span class="muted">${other(o.taxAmount, o.currency, tt.orate) || ""}</span></div>` : null}
+    ${tt.taxAwaiting ? html`<div class="banner b-warn">Imposto por fora ainda não lançado. Quando pagar, lance abaixo.</div>` : null}
+    ${o.taxMode !== "incluso" ? html`
+      ${list.length ? html`<div class="list">${list.map((x) => html`<div class="li" key=${x.id}><div><strong class="tab">${fdate(x.date)} · ${money(x.amount, x.currency)}</strong>
+        <div class="small muted">${[(o.trackings || []).find((k) => k.id === x.trackingId) ? "Pacote " + o.trackings.find((k) => k.id === x.trackingId).code : "Pedido todo", x.rate ? "cotação " + money(x.rate) : null, x.notes].filter(Boolean).join(" · ")}</div></div>
+        ${isAdmin ? html`<${Confirm} small onConfirm=${() => patch({ taxPayments: list.filter((y) => y.id !== x.id) }, "Lançamento excluído.")} />` : null}</div>`)}
+        <div class="li"><strong>Total de imposto pago</strong><strong class="tab">${money(tt.taxPaidBRL)}</strong></div></div>` : null}
+      ${canWrite ? html`<details open=${open} onToggle=${(e) => setOpen(e.target.open)} style="background:var(--surface-2);border-radius:8px;padding:12px"><summary>Lançar imposto pago</summary>
+        <div class="grid g2" style="margin-top:10px">
+          <${Field} label="Data do pagamento"><input type="date" value=${date} onChange=${(e) => { setDate(e.target.value); const rr = rateFor(D.rates, e.target.value); if (rr) setRate(toInput(rr.usdBrl)); }} /><//>
+          <${Field} label="Valor pago"><input inputmode="decimal" value=${amount} onInput=${(e) => setAmount(e.target.value)} /><//>
+          <${Field} label="Moeda"><select value=${currency} onChange=${(e) => setCurrency(e.target.value)}><option value="BRL">R$</option><option value="USD">$</option></select><//>
+          ${currency === "USD" ? html`<${Field} label="Cotação ($1 = R$)"><input inputmode="decimal" value=${rate} onInput=${(e) => setRate(e.target.value)} /><//>` : null}
+          <${Field} label="Referente a"><select value=${trk} onChange=${(e) => setTrk(e.target.value)}><option value="">Pedido todo</option>${(o.trackings || []).map((k) => html`<option key=${k.id} value=${k.id}>Pacote ${k.code}${k.label ? " (" + k.label + ")" : ""}</option>`)}</select><//>
+          <${Field} label="Observação"><input value=${notes} onInput=${(e) => setNotes(e.target.value)} /><//>
+        </div>
+        ${err ? html`<div class="err">${err}</div>` : null}
+        <div style="margin-top:10px"><button class="btn pri" disabled=${busy} onClick=${add}>${busy ? "Lançando…" : "Lançar imposto"}</button></div></details>` : null}` : null}
+  <//>`;
+}
+
+function Trackings({ ctx, o, patch }) {
+  const { D, byId, api, canWrite, notify, today: t } = ctx;
+  const list = o.trackings || [];
+  const [adding, setAdding] = useState(list.length === 0);
+  const [codes, setCodes] = useState("");
+  const [label, setLabel] = useState("");
+  const [carrier, setCarrier] = useState(byId.carriers[o.carrierId]?.name || "");
+  const [status, setStatus] = useState("postado");
+  const [sel, setSel] = useState(new Set());
+  const [bulk, setBulk] = useState("em_transito");
+  const [editing, setEditing] = useState(null);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const counts = {};
+  for (const k of list) counts[k.status] = (counts[k.status] || 0) + 1;
+
+  async function add() {
+    setErr(null);
+    const all = [...new Set(codes.split(/[\s,;]+/).map((c) => c.trim().toUpperCase()).filter(Boolean))];
+    if (!all.length) return setErr("Informe pelo menos um código de rastreio.");
+    const have = new Set(list.map((k) => k.code));
+    const fresh = all.filter((c) => !have.has(c));
+    if (!fresh.length) return setErr("Esses códigos já estão cadastrados neste pedido.");
+    setBusy(true);
+    try {
+      const carrierId = await resolveName(api, D.carriers, "carriers", carrier);
+      await patch({ trackings: [...list, ...fresh.map((code) => ({ id: uid(), code, label: norm(label) || null, carrierId, status, received: false, receivedDate: null, notes: null }))] }, fresh.length + " rastreio(s) adicionado(s).");
+      setCodes("");
+    } finally { setBusy(false); }
+  }
+  async function applyBulk() {
+    await patch({ trackings: list.map((k) => (sel.has(k.id) ? { ...k, status: bulk } : k)) }, "Status aplicado.");
+    setSel(new Set());
+  }
+  return html`<${Card} title=${"Rastreios (" + list.length + ")"}>
+    <datalist id="dl-car2">${D.carriers.map((c) => html`<option key=${c.id} value=${c.name} />`)}</datalist>
+    ${list.length ? html`<div class="row">${Object.entries(counts).map(([s, n]) => html`<${Pill} key=${s} tone=${TRK_TONE[s]}>${TRK_STATUS[s]}: ${n}<//>`)}<${Pill}>Recebidos: ${list.filter((k) => k.received).length}/${list.length}<//></div>` : null}
+    ${canWrite ? (adding ? html`<div style="background:var(--surface-2);border-radius:8px;padding:12px;display:grid;gap:10px">
+      <${Field} label="Códigos de rastreio" hint="Cole um ou vários códigos (um por linha ou separados por espaço/vírgula)."><textarea rows="3" value=${codes} onInput=${(e) => setCodes(e.target.value)} placeholder=${"LZ469784745CN\nLZ468458427CN"}></textarea><//>
+      <div class="grid g2">
+        <${Field} label="Conteúdo (opcional)"><input value=${label} onInput=${(e) => setLabel(e.target.value)} placeholder="Ex.: Internacional" /><//>
+        <${Field} label="Transportadora"><input list="dl-car2" value=${carrier} onInput=${(e) => setCarrier(e.target.value)} /><//>
+        <${Field} label="Status inicial"><select value=${status} onChange=${(e) => setStatus(e.target.value)}>${Object.entries(TRK_STATUS).map(([k, l]) => html`<option key=${k} value=${k}>${l}</option>`)}</select><//>
+      </div>
+      ${err ? html`<div class="err">${err}</div>` : null}
+      <div class="row"><button class="btn pri" disabled=${busy} onClick=${add}>${busy ? "Adicionando…" : "Adicionar rastreios"}</button>${list.length ? html`<button class="btn" onClick=${() => setAdding(false)}>Fechar</button>` : null}</div></div>`
+      : html`<div><button class="btn" onClick=${() => setAdding(true)}>+ Adicionar rastreios</button></div>`) : null}
+    ${list.length && canWrite ? html`<div class="row" style="border:1px solid var(--line);border-radius:8px;padding:8px">
+      <label class="chk"><input type="checkbox" checked=${sel.size === list.length} onChange=${(e) => setSel(e.target.checked ? new Set(list.map((k) => k.id)) : new Set())} />Todos</label>
+      <span class="small muted">${sel.size} selecionado(s) →</span>
+      <select style="width:auto" value=${bulk} onChange=${(e) => setBulk(e.target.value)}>${Object.entries(TRK_STATUS).map(([k, l]) => html`<option key=${k} value=${k}>${l}</option>`)}</select>
+      <button class="btn sm" disabled=${!sel.size} onClick=${applyBulk}>Aplicar status</button></div>` : null}
+    ${list.length ? html`<div class="list">${list.map((k) => html`<div key=${k.id} style="padding:8px 0">
+      <div class="row" style="align-items:flex-start;flex-wrap:nowrap">
+        ${canWrite ? html`<input type="checkbox" checked=${sel.has(k.id)} onChange=${() => setSel((s) => { const n = new Set(s); n.has(k.id) ? n.delete(k.id) : n.add(k.id); return n; })} />` : null}
+        <div style="flex:1;min-width:0"><div class="row"><a class="mono" href=${trackingLink(k.code, byId.carriers[k.carrierId])} target="_blank" rel="noreferrer">${k.code}</a><${Pill} tone=${TRK_TONE[k.status]}>${TRK_STATUS[k.status]}<//>${k.received ? html`<${Pill} tone="p-good">Recebido ${fdate(k.receivedDate)}<//>` : null}</div>
+          <div class="small muted">${[k.label, byId.carriers[k.carrierId]?.name, k.notes].filter(Boolean).join(" · ")}</div></div>
+        ${canWrite ? html`<button class="btn sm" onClick=${() => setEditing(editing === k.id ? null : k.id)}>${editing === k.id ? "Fechar" : "Editar"}</button>` : null}</div>
+      ${editing === k.id ? html`<${TrackingEdit} ctx=${ctx} o=${o} k=${k} patch=${patch} done=${() => setEditing(null)} />` : null}</div>`)}</div>` : null}
+  <//>`;
+}
+
+function TrackingEdit({ ctx, o, k, patch, done }) {
+  const { D, byId, api, today: t } = ctx;
+  const [v, setV] = useState({ code: k.code, label: k.label || "", carrier: byId.carriers[k.carrierId]?.name || "", status: k.status, received: !!k.received, receivedDate: k.receivedDate || t, notes: k.notes || "" });
+  const [busy, setBusy] = useState(false);
+  const set = (a, b) => setV((s) => ({ ...s, [a]: b }));
+  async function save() {
+    setBusy(true);
+    try {
+      const carrierId = await resolveName(api, D.carriers, "carriers", v.carrier);
+      await patch({ trackings: o.trackings.map((x) => (x.id === k.id ? { ...x, code: v.code.trim().toUpperCase() || x.code, label: norm(v.label) || null, carrierId, status: v.status, received: v.received, receivedDate: v.received ? v.receivedDate : null, notes: v.notes.trim() || null } : x)) }, "Rastreio salvo.");
+      done();
+    } finally { setBusy(false); }
+  }
+  return html`<div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-top:8px;display:grid;gap:10px"><div class="grid g2">
+    <${Field} label="Código"><input value=${v.code} onInput=${(e) => set("code", e.target.value)} /><//>
+    <${Field} label="Conteúdo"><input value=${v.label} onInput=${(e) => set("label", e.target.value)} /><//>
+    <${Field} label="Transportadora"><input list="dl-car2" value=${v.carrier} onInput=${(e) => set("carrier", e.target.value)} /><//>
+    <${Field} label="Status"><select value=${v.status} onChange=${(e) => set("status", e.target.value)}>${Object.entries(TRK_STATUS).map(([a, l]) => html`<option key=${a} value=${a}>${l}</option>`)}</select><//>
+    <label class="chk"><input type="checkbox" checked=${v.received} onChange=${(e) => set("received", e.target.checked)} />Pacote recebido</label>
+    ${v.received ? html`<${Field} label="Recebido em"><input type="date" value=${v.receivedDate} onChange=${(e) => set("receivedDate", e.target.value)} /><//>` : null}
+    <${Field} label="Observação"><input value=${v.notes} onInput=${(e) => set("notes", e.target.value)} /><//>
+  </div><div class="row between"><button class="btn pri" disabled=${busy} onClick=${save}>${busy ? "Salvando…" : "Salvar"}</button>
+    <${Confirm} small label="Excluir rastreio" onConfirm=${async () => { await patch({ trackings: o.trackings.filter((x) => x.id !== k.id), taxPayments: (o.taxPayments || []).map((x) => (x.trackingId === k.id ? { ...x, trackingId: null } : x)) }, "Rastreio excluído."); done(); }} /></div></div>`;
+}
+
+// ---------------- Conferência ----------------
+function Conference({ ctx, id }) {
+  const { D, byId, api, go, notify, today: t } = ctx;
+  const o = D.orders.find((x) => x.id === id);
+  const [items, setItems] = useState(() => (o?.items || []).map((i) => ({ id: i.id, name: byId.products[i.productId]?.name || "—", variant: i.variant, expected: n0(i.pieces), sizes: i.sizes, rq: i.receivedQty == null ? "" : String(i.receivedQty), dq: i.defectiveQty == null ? "" : String(i.defectiveQty), notes: i.checkNotes || "", rs: i.receivedSizes ? Object.fromEntries(Object.entries(i.receivedSizes).map(([s, q]) => [s, String(q)])) : null })));
+  const [trk, setTrk] = useState(() => (o?.trackings || []).map((k) => ({ id: k.id, code: k.code, label: k.label, received: !!k.received, date: k.receivedDate || "" })));
+  const [upd, setUpd] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  if (!o) return html`<${Head} title="Pedido não encontrado" back=${() => go("pedidos")} />`;
+  const up = (iid, p) => setItems((l) => l.map((i) => (i.id === iid ? { ...i, ...p } : i)));
+  const fullSizes = (i) => (i.sizes ? Object.fromEntries(Object.entries(i.sizes).map(([s, q]) => [s, String(q)])) : null);
+  const exp = items.reduce((s, i) => s + i.expected, 0), rec = items.reduce((s, i) => s + (parseDec(i.rq) || 0), 0), def = items.reduce((s, i) => s + (parseDec(i.dq) || 0), 0);
+  const int = (v) => { const n = parseDec(v); return n === null ? null : Math.max(0, Math.round(n)); };
+  async function save() {
+    setBusy(true); setErr(null);
+    try {
+      const newItems = o.items.map((i) => {
+        const c = items.find((x) => x.id === i.id);
+        if (!c) return i;
+        let rs = null;
+        if (c.rs) { rs = {}; for (const [s, q] of Object.entries(c.rs)) { const n = int(q); if (n !== null) rs[s] = n; } if (!Object.keys(rs).length) rs = null; }
+        return { ...i, receivedQty: int(c.rq), defectiveQty: int(c.dq), checkNotes: c.notes.trim() || null, receivedSizes: rs };
+      });
+      const newTrk = (o.trackings || []).map((k) => { const c = trk.find((x) => x.id === k.id); return c ? { ...k, received: c.received, receivedDate: c.received ? c.date || t : null, status: c.received ? "entregue" : k.status } : k; });
+      const p = { items: newItems, trackings: newTrk };
+      if (upd && !["finalizado", "cancelado"].includes(o.status) && rec > 0) p.status = rec >= exp ? "recebido" : "recebido_parcial";
+      await api.patchOrder(o.id, p);
+      notify("Conferência salva.");
+      go("pedido", { id: o.id });
+    } catch (e) { console.error(e); setErr("Não foi possível salvar. Tente de novo."); }
+    setBusy(false);
+  }
+  return html`<${Head} title=${"Conferência #" + o.number} back=${() => go("pedido", { id: o.id })} />
+    <p class="muted" style="margin:0">${o.title}. Informe quanto chegou de cada item e marque os pacotes recebidos. Pode conferir aos poucos.</p>
+    <div><button class="btn" onClick=${() => { setItems((l) => l.map((i) => ({ ...i, rq: String(i.expected), rs: fullSizes(i) }))); setTrk((l) => l.map((k) => ({ ...k, received: true, date: k.date || t }))); }}>✓ Marcar tudo como recebido</button></div>
+    ${trk.length ? html`<${Card} title=${"Pacotes (" + trk.filter((k) => k.received).length + "/" + trk.length + " recebidos)"}><div class="list">${trk.map((k) => html`<div class="li" key=${k.id}>
+      <label class="chk"><input type="checkbox" checked=${k.received} onChange=${(e) => setTrk((l) => l.map((x) => (x.id === k.id ? { ...x, received: e.target.checked, date: x.date || t } : x)))} /><span class="mono">${k.code}</span>${k.label ? html`<span class="muted">(${k.label})</span>` : null}</label>
+      ${k.received ? html`<input type="date" style="width:auto" value=${k.date} onChange=${(e) => setTrk((l) => l.map((x) => (x.id === k.id ? { ...x, date: e.target.value } : x)))} />` : null}</div>`)}</div><//>` : null}
+    <${Card} title="Itens">${items.map((i) => {
+      const r = parseDec(i.rq), d = parseDec(i.dq) || 0, diff = r === null ? null : r - i.expected;
+      return html`<div key=${i.id} class=${cx("itembox", r !== null && (diff === 0 && d === 0 ? "ok" : "diff"))}>
+        <div class="row between" style="align-items:flex-start"><div><strong>${i.name}</strong><div class="small muted">${i.variant ? i.variant + " · " : ""}Esperado: <strong>${i.expected}</strong> peças</div></div>
+          <button class="btn sm" onClick=${() => up(i.id, { rq: String(i.expected), rs: fullSizes(i) })}>Recebi tudo</button></div>
+        ${i.sizes ? html`<div class="row">${Object.entries(i.sizes).map(([s, q]) => html`<${Field} key=${s} label=${s + " (esp. " + q + ")"} className="sz"><input inputmode="numeric" style="width:90px" value=${i.rs?.[s] ?? ""} onInput=${(e) => { const rs = { ...(i.rs || {}), [s]: e.target.value }; up(i.id, { rs, rq: String(Object.values(rs).reduce((a, v) => a + (parseDec(v) || 0), 0)) }); }} /><//>`)}</div>` : null}
+        <div class="grid g2">
+          <${Field} label="Recebido"><input inputmode="numeric" value=${i.rq} onInput=${(e) => up(i.id, { rq: e.target.value })} style="font-weight:600" /><//>
+          <${Field} label="Com defeito"><input inputmode="numeric" value=${i.dq} onInput=${(e) => up(i.id, { dq: e.target.value })} /><//>
+          <${Field} label="Observação"><input value=${i.notes} onInput=${(e) => up(i.id, { notes: e.target.value })} /><//>
+        </div>
+        ${diff !== null && (diff !== 0 || d > 0) ? html`<div class="small" style="color:var(--warn);font-weight:600">${diff < 0 ? "Faltam " + -diff + " peças. " : ""}${diff > 0 ? "Vieram " + diff + " peças a mais. " : ""}${d > 0 ? d + " com defeito." : ""}</div>` : null}</div>`;
+    })}<//>
+    <div class="sticky-foot">
+      <div class="row" style="gap:18px"><div><div class="small muted">Esperado</div><strong class="tab">${exp}</strong></div><div><div class="small muted">Recebido</div><strong class="tab" style=${rec < exp ? "color:var(--warn)" : "color:var(--good)"}>${rec}</strong></div><div><div class="small muted">Com defeito</div><strong class="tab" style=${def > 0 ? "color:var(--bad)" : ""}>${def}</strong></div></div>
+      <label class="chk"><input type="checkbox" checked=${upd} onChange=${(e) => setUpd(e.target.checked)} />Atualizar status do pedido (Recebido / Recebido parcialmente)</label>
+      ${err ? html`<div class="err">${err}</div>` : null}
+      <div class="row"><button class="btn pri" disabled=${busy} onClick=${save}>${busy ? "Salvando…" : "Salvar conferência"}</button><button class="btn" onClick=${() => go("pedido", { id: o.id })}>Cancelar</button></div>
+    </div>`;
+}
+
+// ---------------- Cotação ----------------
+function Rates({ ctx }) {
+  const { D, api, isAdmin, canWrite, notify, today: t } = ctx;
+  const todayRow = D.rates.find((r) => r.id === t);
+  const [day, setDay] = useState(t);
+  const [val, setVal] = useState(toInput(todayRow?.usdBrl));
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const rows = [...D.rates].sort((a, b) => (a.id < b.id ? 1 : -1)).slice(0, 90);
+  async function save() {
+    setErr(null);
+    const v = parseDec(val);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return setErr("Data inválida.");
+    if (!v || v <= 0) return setErr("Informe a cotação (ex.: 5,42).");
+    setBusy(true);
+    try { await api.setRate(day, v); notify("Cotação salva."); } catch (e) { console.error(e); setErr("Não foi possível salvar."); }
+    setBusy(false);
+  }
+  return html`<${Head} title="Cotação do dólar" />
+    <p class="muted" style="margin:0">Defina o valor do dólar do dia. Ele é sugerido nos pedidos e pagamentos daquela data (você pode ajustar em cada um). Se um dia não tiver cotação, vale a última cadastrada antes dele.</p>
+    <${Card} title=${todayRow ? "Hoje: $1 = " + money(todayRow.usdBrl) : "Cotação de hoje ainda não definida"}>
+      ${canWrite ? html`<div class="row" style="align-items:flex-end">
+        <${Field} label="Dia"><input type="date" value=${day} onChange=${(e) => setDay(e.target.value)} /><//>
+        <${Field} label="$1 = R$"><input inputmode="decimal" placeholder="5,42" value=${val} onInput=${(e) => setVal(e.target.value)} /><//>
+        <button class="btn pri" disabled=${busy} onClick=${save}>${busy ? "Salvando…" : "Salvar cotação"}</button></div>${err ? html`<div class="err">${err}</div>` : null}` : null}
+    <//>
+    <${Card} title="Histórico">${rows.length ? html`<div class="list">${rows.map((r) => html`<div class="li" key=${r.id}><span>${fdate(r.id)}</span><span class="row"><strong class="tab">${money(r.usdBrl)}</strong>${isAdmin ? html`<${Confirm} small onConfirm=${() => api.deleteRate(r.id)} />` : null}</span></div>`)}</div>` : html`<div class="empty">Nenhuma cotação cadastrada.</div>`}<//>`;
+}
+
+// ---------------- Cadastros ----------------
+function Cadastros({ ctx }) {
+  const { D, api, isAdmin, canWrite, notify } = ctx;
+  const [tab, setTab] = useState("suppliers");
+  const cfg = ENT[tab];
+  const rows = [...D[tab]].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const blank = () => Object.fromEntries(cfg.fields.map(([k]) => [k, ""]));
+  const [form, setForm] = useState(blank);
+  const [edit, setEdit] = useState(null);
+  const [err, setErr] = useState(null);
+  useEffect(() => { setForm(blank()); setEdit(null); setErr(null); }, [tab]);
+  function usedBy(id) {
+    return D.orders.some((o) => o.supplierId === id || o.modeId === id || o.carrierId === id || (o.items || []).some((i) => i.productId === id) || (o.payments || []).some((p) => p.methodId === id) || (o.trackings || []).some((k) => k.carrierId === id));
+  }
+  async function save(values, id) {
+    setErr(null);
+    const name = norm(values.name);
+    if (!name) return setErr("Informe o nome.");
+    if (D[tab].some((x) => key(x.name) === key(name) && x.id !== id)) return setErr("Já existe um(a) " + cfg.one + " com esse nome.");
+    const body = {};
+    for (const [k, , type] of cfg.fields) { const v = values[k]; body[k] = type === "int" ? (parseDec(v) === null ? null : Math.round(parseDec(v))) : norm(v) || null; }
+    body.name = name;
+    try {
+      const prev = id ? D[tab].find((x) => x.id === id) : null;
+      await api.saveEntity(tab, id || uid(), { ...(prev ? { createdAt: prev.createdAt } : { createdAt: new Date().toISOString() }), ...body });
+      notify("Salvo.");
+      if (id) setEdit(null); else setForm(blank());
+    } catch (e) { console.error(e); setErr("Não foi possível salvar."); }
+  }
+  const fields = (values, onChange) => html`<div class="grid g2">${cfg.fields.map(([k, l, type]) => html`<${Field} key=${k} label=${l}><input inputmode=${type === "int" ? "numeric" : undefined} value=${values[k] ?? ""} onInput=${(e) => onChange({ ...values, [k]: e.target.value })} /><//>`)}</div>`;
+  return html`<${Head} title="Cadastros" />
+    <div class="tabs">${Object.entries(ENT).map(([k, c]) => html`<button key=${k} class=${tab === k ? "on" : ""} onClick=${() => setTab(k)}>${c.title}</button>`)}<button class=${tab === "backup" ? "on" : ""} onClick=${() => setTab("backup")}>Backup</button></div>
+    ${tab === "backup" ? html`<${Backup} ctx=${ctx} />` : html`
+    ${canWrite ? html`<${Card} title=${"Novo(a) " + cfg.one}>${fields(form, setForm)}${err && !edit ? html`<div class="err">${err}</div>` : null}<div><button class="btn pri" onClick=${() => save(form)}>Adicionar</button></div><//>` : null}
+    <${Card} title=${rows.length + " cadastrado(s)"}>${rows.length ? html`<div class="list">${rows.map((r) => edit && edit.id === r.id ? html`<div key=${r.id} style="padding:10px 0;display:grid;gap:10px">
+        ${fields(edit, setEdit)}${err ? html`<div class="err">${err}</div>` : null}
+        <div class="row"><button class="btn pri" onClick=${() => save(edit, r.id)}>Salvar</button><button class="btn" onClick=${() => setEdit(null)}>Cancelar</button></div></div>`
+      : html`<div class="li" key=${r.id}><div style="min-width:0"><strong>${r.name}</strong><div class="small muted">${cfg.fields.slice(1).map(([k, l]) => (r[k] ? l + ": " + r[k] : null)).filter(Boolean).join(" · ")}</div></div>
+        <div class="row">${canWrite ? html`<button class="btn sm" onClick=${() => { setErr(null); setEdit({ id: r.id, ...Object.fromEntries(cfg.fields.map(([k]) => [k, r[k] == null ? "" : String(r[k])])) }); }}>Editar</button>` : null}
+        ${isAdmin ? (usedBy(r.id) ? html`<span class="small muted">Em uso</span>` : html`<${Confirm} small onConfirm=${() => api.deleteEntity(tab, r.id)} />`) : null}</div></div>`)}</div>` : html`<div class="empty">Nenhum cadastro ainda. Também dá para cadastrar na hora, digitando um nome novo no pedido.</div>`}<//>`}`;
+}
+
+function Backup({ ctx }) {
+  const { D, notify } = ctx;
+  return html`<${Card} title="Backup dos dados">
+    <p style="margin:0">Baixa um arquivo com todos os pedidos, cadastros e cotações. Guarde no Google Drive de vez em quando.</p>
+    <div class="row"><button class="btn pri" onClick=${() => saveFile("encomendas-backup-" + today() + ".json", JSON.stringify({ exportedAt: new Date().toISOString(), ...D }, null, 2), notify)}>⬇ Baixar backup</button></div>
+    <p class="small muted" style="margin:0">${D.orders.length} pedidos · ${D.suppliers.length} fornecedores · ${D.products.length} produtos · ${D.rates.length} cotações</p>
+  <//>`;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
+})();
+</script>
