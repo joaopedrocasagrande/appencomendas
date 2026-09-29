@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CURRENCIES, ORDER_STATUSES } from "@/db/schema";
+import { CURRENCIES, ORDER_STATUSES, TAX_MODES } from "@/db/schema";
 
 const text = z.string().trim().max(500).optional().default("");
 const date = z
@@ -48,10 +48,8 @@ export const orderSchema = z.object({
   exchangeRate: num,
   freight: num,
   discount: num,
-  hasTax: z.boolean(),
-  taxIncluded: z.boolean(),
+  taxMode: z.enum(TAX_MODES),
   taxAmount: num,
-  taxPaid: z.boolean(),
   status: z.enum(ORDER_STATUSES),
   notes: z.string().max(5000).optional().default(""),
   needsReview: z.boolean(),

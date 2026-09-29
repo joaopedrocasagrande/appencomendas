@@ -1,4 +1,4 @@
-import type { Currency } from "@/db/schema";
+import type { Currency, TaxMode } from "@/db/schema";
 import type { PaymentStatus } from "./labels";
 
 type Num = string | number | null | undefined;
@@ -27,13 +27,11 @@ export type OrderForTotals = {
   exchangeRate: Num;
   freight: Num;
   discount: Num;
-  hasTax: boolean;
-  taxIncluded: boolean;
+  taxMode: TaxMode;
   taxAmount: Num;
-  taxPaid: boolean;
   items: { totalPieces: number; unitPrice: Num }[];
   expenses: { amount: Num; currency: Currency; chargedBySupplier: boolean; paid: boolean }[];
-  trackings: { taxAmount: Num; taxCurrency: Currency; taxPaid: boolean }[];
+  taxPayments: { amount: Num; currency: Currency; exchangeRate: Num }[];
   payments: { amount: Num; currency: Currency; exchangeRate: Num }[];
 };
 
@@ -43,8 +41,8 @@ export type OrderTotals = ReturnType<typeof computeOrderTotals>;
  * Regras:
  * - Total a pagar ao fornecedor = produtos + frete − desconto + despesas cobradas pelo fornecedor.
  * - Imposto "incluso no pedido" já está dentro do valor (é apenas informativo).
- * - Imposto não incluso, impostos por rastreio e despesas não cobradas pelo fornecedor
- *   são custos à parte, com controle próprio de pago/pendente.
+ * - Imposto "por fora" é lançado depois de pago (tax_payments) e entra nos custos à parte,
+ *   junto com as despesas não cobradas pelo fornecedor.
  * - Pagamentos são convertidos para a moeda do pedido pela cotação do próprio pagamento.
  */
 export function computeOrderTotals(o: OrderForTotals) {
@@ -93,24 +91,24 @@ export function computeOrderTotals(o: OrderForTotals) {
   else paymentStatus = "pendente";
 
   // Custos à parte (em R$)
-  const orderTaxSeparate = o.hasTax && !o.taxIncluded ? n(o.taxAmount) : 0;
-  const orderTaxBRL = toBRL(orderTaxSeparate, cur);
-  const trackingTaxBRL = o.trackings.reduce((s, t) => s + toBRL(n(t.taxAmount), t.taxCurrency), 0);
+  const taxPaidBRL = round2(
+    o.taxMode === "por_fora"
+      ? o.taxPayments.reduce((s, t) => s + toBRL(n(t.amount), t.currency, rateOf(t.exchangeRate)), 0)
+      : 0,
+  );
   const otherExpensesBRL = o.expenses
     .filter((e) => !e.chargedBySupplier)
     .reduce((s, e) => s + toBRL(n(e.amount), e.currency), 0);
-  const extrasBRL = round2(orderTaxBRL + trackingTaxBRL + otherExpensesBRL);
+  const extrasBRL = round2(taxPaidBRL + otherExpensesBRL);
   const extrasPendingBRL = round2(
-    (o.taxPaid ? 0 : orderTaxBRL) +
-      o.trackings.filter((t) => !t.taxPaid).reduce((s, t) => s + toBRL(n(t.taxAmount), t.taxCurrency), 0) +
-      o.expenses
-        .filter((e) => !e.chargedBySupplier && !e.paid)
-        .reduce((s, e) => s + toBRL(n(e.amount), e.currency), 0),
+    o.expenses
+      .filter((e) => !e.chargedBySupplier && !e.paid)
+      .reduce((s, e) => s + toBRL(n(e.amount), e.currency), 0),
   );
-
-  const taxTotalBRL = round2(
-    toBRL(o.hasTax ? n(o.taxAmount) : 0, cur) + trackingTaxBRL,
-  );
+  // Imposto por fora ainda sem nenhum lançamento
+  const taxAwaiting = o.taxMode === "por_fora" && o.taxPayments.length === 0;
+  const taxIncludedBRL = o.taxMode === "incluso" ? round2(toBRL(n(o.taxAmount), cur)) : 0;
+  const taxTotalBRL = round2(taxPaidBRL + taxIncludedBRL);
 
   // Custo real em R$: pagamentos já feitos (na cotação de cada um) + saldo pela cotação do pedido + custos à parte
   const paidBRL = o.payments.reduce(
@@ -135,7 +133,8 @@ export function computeOrderTotals(o: OrderForTotals) {
     pending,
     pendingBRL: round2(pendingBRL),
     paymentStatus,
-    orderTaxSeparate,
+    taxPaidBRL,
+    taxAwaiting,
     extrasBRL,
     extrasPendingBRL,
     taxTotalBRL,

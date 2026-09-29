@@ -15,6 +15,7 @@ import {
   payments,
   products,
   suppliers,
+  taxPayments,
   trackings,
   TRACKING_STATUSES,
   transportModes,
@@ -73,10 +74,8 @@ export async function saveOrder(raw: OrderInput): Promise<{ error?: string; id?:
       exchangeRate: rate ? String(rate) : null,
       freight: dec(input.freight, "0")!,
       discount: dec(input.discount, "0")!,
-      hasTax: input.hasTax,
-      taxIncluded: input.hasTax && input.taxIncluded,
-      taxAmount: input.hasTax ? dec(input.taxAmount, "0")! : "0",
-      taxPaid: input.hasTax && input.taxPaid,
+      taxMode: input.taxMode,
+      taxAmount: input.taxMode === "incluso" ? dec(input.taxAmount, "0")! : "0",
       status: input.status,
       notes: input.notes.trim() || null,
       needsReview: input.needsReview,
@@ -198,14 +197,59 @@ export async function markReviewed(formData: FormData) {
   revalidateOrder(id);
 }
 
-export async function toggleOrderTaxPaid(formData: FormData) {
-  await assertUser();
+// ---------------- Impostos pagos por fora ----------------
+
+export async function addTaxPayment(orderId: number, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const user = await assertUser();
+  const paidOn = String(formData.get("paidOn") ?? "");
+  const amount = parseDecimal(formData.get("amount"));
+  const currency = String(formData.get("currency")) as Currency;
+  const rate = parseDecimal(formData.get("exchangeRate"));
+  const trackingId = Number(formData.get("trackingId") || 0) || null;
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn)) return { error: "Informe a data do pagamento do imposto." };
+  if (!amount || amount <= 0) return { error: "Informe o valor do imposto pago." };
+  if (!CURRENCIES.includes(currency)) return { error: "Moeda inválida." };
+  if (currency === "USD" && !rate) return { error: "Informe a cotação para converter o imposto em reais." };
+
+  const order = await db.query.orders.findFirst({ where: eq(orders.id, orderId), columns: { id: true } });
+  if (!order) return { error: "Pedido não encontrado." };
+  if (trackingId) {
+    const tr = await db.query.trackings.findFirst({
+      where: and(eq(trackings.id, trackingId), eq(trackings.orderId, orderId)),
+      columns: { id: true },
+    });
+    if (!tr) return { error: "Rastreio inválido." };
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.insert(taxPayments).values({
+      orderId,
+      trackingId,
+      paidOn,
+      amount: String(amount),
+      currency,
+      exchangeRate: rate ? String(rate) : null,
+      notes: notes || null,
+      createdById: user.id,
+    });
+    // Lançar imposto num pedido marcado "sem imposto" passa a tratá-lo como "por fora".
+    await tx
+      .update(orders)
+      .set({ taxMode: "por_fora", updatedAt: new Date() })
+      .where(and(eq(orders.id, orderId), eq(orders.taxMode, "sem")));
+  });
+  revalidateOrder(orderId);
+  return { ok: true };
+}
+
+export async function deleteTaxPayment(formData: FormData) {
+  await assertAdmin();
   const id = Number(formData.get("id"));
-  await db
-    .update(orders)
-    .set({ taxPaid: formData.get("taxPaid") === "true" })
-    .where(eq(orders.id, id));
-  revalidateOrder(id);
+  const orderId = Number(formData.get("orderId"));
+  await db.delete(taxPayments).where(and(eq(taxPayments.id, id), eq(taxPayments.orderId, orderId)));
+  revalidateOrder(orderId);
 }
 
 export async function toggleExpensePaid(formData: FormData) {
@@ -311,13 +355,10 @@ export async function updateTracking(orderId: number, _prev: ActionResult, formD
   await assertUser();
   const id = Number(formData.get("id"));
   const status = String(formData.get("status")) as TrackingStatus;
-  const taxAmount = parseDecimal(formData.get("taxAmount")) ?? 0;
-  const taxCurrency = String(formData.get("taxCurrency") ?? "BRL") as Currency;
   const received = formData.get("received") === "on";
   const receivedDate = String(formData.get("receivedDate") ?? "");
 
   if (!TRACKING_STATUSES.includes(status)) return { error: "Status inválido." };
-  if (!CURRENCIES.includes(taxCurrency)) return { error: "Moeda inválida." };
 
   await db.transaction(async (tx) => {
     const carrierId = await resolveByName(tx, carriers, String(formData.get("carrier") ?? ""));
@@ -328,9 +369,6 @@ export async function updateTracking(orderId: number, _prev: ActionResult, formD
         label: String(formData.get("label") ?? "").trim() || null,
         carrierId,
         status,
-        taxAmount: String(taxAmount),
-        taxCurrency,
-        taxPaid: formData.get("taxPaid") === "on",
         received,
         receivedDate: received && /^\d{4}-\d{2}-\d{2}$/.test(receivedDate) ? receivedDate : null,
         notes: String(formData.get("notes") ?? "").trim() || null,

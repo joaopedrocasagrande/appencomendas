@@ -20,7 +20,7 @@ export default async function RatesPage() {
         Defina o valor do dólar do dia. Ele é sugerido automaticamente nos pedidos e pagamentos daquela data (você
         ainda pode ajustar em cada um). Se um dia não tiver cotação, é usada a última cadastrada antes dele.
       </p>
-      <Card title={todayRow ? `Hoje: US$ 1 = ${fmtMoney(Number(todayRow.usdBrl))}` : "Cotação de hoje ainda não definida"}>
+      <Card title={todayRow ? `Hoje: $1 = ${fmtMoney(Number(todayRow.usdBrl))}` : "Cotação de hoje ainda não definida"}>
         <RateForm today={today} current={todayRow ? toInput(todayRow.usdBrl) : undefined} />
       </Card>
       <Card title="Histórico">

@@ -12,8 +12,8 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
-import { CURRENCIES, TRACKING_STATUSES, type Currency, type TrackingStatus } from "@/db/schema";
-import { fmtDate, fmtMoney, toInput } from "@/lib/format";
+import { TRACKING_STATUSES, type TrackingStatus } from "@/db/schema";
+import { fmtDate, fmtMoney } from "@/lib/format";
 import { TRACKING_STATUS_COLOR, TRACKING_STATUS_LABEL } from "@/lib/labels";
 import { addTrackings, bulkTrackingStatus, deleteTracking, updateTracking, type ActionResult } from "../actions";
 
@@ -23,9 +23,8 @@ export type TrackingView = {
   label: string | null;
   carrierName: string;
   status: TrackingStatus;
-  taxAmount: string;
-  taxCurrency: Currency;
-  taxPaid: boolean;
+  // Soma dos impostos lançados para este pacote, em R$
+  taxBRL: number;
   received: boolean;
   receivedDate: string | null;
   notes: string | null;
@@ -206,8 +205,6 @@ function TrackingRow({
   }, undefined);
   const [received, setReceived] = useState(t.received);
 
-  const tax = Number(t.taxAmount);
-
   return (
     <li className="py-2">
       <div className="flex items-start gap-2">
@@ -221,7 +218,7 @@ function TrackingRow({
             {t.received && <Badge className="bg-green-100 text-green-800">Recebido {fmtDate(t.receivedDate)}</Badge>}
           </div>
           <div className="text-xs text-slate-500">
-            {[t.label, t.carrierName, tax > 0 ? `Imposto ${fmtMoney(tax, t.taxCurrency)} ${t.taxPaid ? "(pago)" : "(pendente)"}` : null, t.notes]
+            {[t.label, t.carrierName, t.taxBRL > 0 ? `Imposto pago ${fmtMoney(t.taxBRL)}` : null, t.notes]
               .filter(Boolean)
               .join(" · ")}
           </div>
@@ -250,20 +247,6 @@ function TrackingRow({
                 <StatusOptions />
               </Select>
             </Field>
-            <Field label="Imposto do pacote">
-              <Input name="taxAmount" inputMode="decimal" defaultValue={toInput(t.taxAmount)} />
-            </Field>
-            <Field label="Moeda">
-              <Select name="taxCurrency" defaultValue={t.taxCurrency}>
-                {CURRENCIES.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </Select>
-            </Field>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="taxPaid" defaultChecked={t.taxPaid} className="size-4" />
-              Imposto pago
-            </label>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"

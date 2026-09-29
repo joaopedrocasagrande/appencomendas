@@ -1,5 +1,5 @@
 {
-  "id": "9e7bb758-ab74-4b04-842a-ea8df0b395c2",
+  "id": "1e60f7a8-27af-4357-b4cd-26de2235d95d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -367,19 +367,12 @@
           "notNull": true,
           "default": "'0'"
         },
-        "has_tax": {
-          "name": "has_tax",
-          "type": "boolean",
+        "tax_mode": {
+          "name": "tax_mode",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": false
-        },
-        "tax_included": {
-          "name": "tax_included",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
+          "default": "'sem'"
         },
         "tax_amount": {
           "name": "tax_amount",
@@ -387,13 +380,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'0'"
-        },
-        "tax_paid": {
-          "name": "tax_paid",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "status": {
           "name": "status",
@@ -749,6 +735,121 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.tax_payments": {
+      "name": "tax_payments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tracking_id": {
+          "name": "tracking_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paid_on": {
+          "name": "paid_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'BRL'"
+        },
+        "exchange_rate": {
+          "name": "exchange_rate",
+          "type": "numeric(12, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tax_payments_order_id_orders_id_fk": {
+          "name": "tax_payments_order_id_orders_id_fk",
+          "tableFrom": "tax_payments",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tax_payments_tracking_id_trackings_id_fk": {
+          "name": "tax_payments_tracking_id_trackings_id_fk",
+          "tableFrom": "tax_payments",
+          "tableTo": "trackings",
+          "columnsFrom": [
+            "tracking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "tax_payments_created_by_id_users_id_fk": {
+          "name": "tax_payments_created_by_id_users_id_fk",
+          "tableFrom": "tax_payments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.trackings": {
       "name": "trackings",
       "schema": "",
@@ -789,27 +890,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'postado'"
-        },
-        "tax_amount": {
-          "name": "tax_amount",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'0'"
-        },
-        "tax_currency": {
-          "name": "tax_currency",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'BRL'"
-        },
-        "tax_paid": {
-          "name": "tax_paid",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "received": {
           "name": "received",

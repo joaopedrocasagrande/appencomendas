@@ -1,4 +1,4 @@
-import type { OrderStatus, TrackingStatus } from "@/db/schema";
+import type { OrderStatus, TaxMode, TrackingStatus } from "@/db/schema";
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   cotacao: "Cotação",
@@ -72,3 +72,15 @@ export const VARIANT_SUGGESTIONS = [
 ];
 
 export const SIZE_SUGGESTIONS = ["PP", "P", "M", "G", "GG", "XGG", "2XL", "3XL", "4XL"];
+
+export const TAX_MODE_LABEL: Record<TaxMode, string> = {
+  sem: "Sem imposto",
+  incluso: "Incluso no pedido",
+  por_fora: "Pago por fora",
+};
+
+export const TAX_MODE_HINT: Record<TaxMode, string> = {
+  sem: "Este pedido não tem imposto.",
+  incluso: "Já está dentro do valor pago ao fornecedor.",
+  por_fora: "Pago depois, separado. Lance no pedido quando pagar.",
+};

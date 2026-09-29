@@ -22,6 +22,8 @@ import {
   ORDER_STATUS_LABEL,
   PAYMENT_STATUS_COLOR,
   PAYMENT_STATUS_LABEL,
+  TAX_MODE_HINT,
+  TAX_MODE_LABEL,
 } from "@/lib/labels";
 import { loadOptions, loadOrder, trackingLink } from "@/lib/orders";
 import { getRateFor } from "@/lib/rates";
@@ -30,10 +32,11 @@ import {
   deletePayment,
   markReviewed,
   toggleExpensePaid,
-  toggleOrderTaxPaid,
+  deleteTaxPayment,
   updateOrderStatus,
 } from "../actions";
 import { PaymentForm } from "./payment-form";
+import { TaxPaymentForm } from "./tax-payment-form";
 import { TrackingsPanel, type TrackingView } from "./trackings-panel";
 
 const CLOSED = ["recebido", "finalizado", "cancelado"];
@@ -63,9 +66,13 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
       label: tr.label,
       carrierName: tr.carrier?.name ?? "",
       status: tr.status,
-      taxAmount: tr.taxAmount,
-      taxCurrency: tr.taxCurrency,
-      taxPaid: tr.taxPaid,
+      taxBRL: order.taxPayments
+        .filter((tp) => tp.trackingId === tr.id)
+        .reduce(
+          (s, tp) =>
+            s + (convert(Number(tp.amount), tp.currency, "BRL", Number(tp.exchangeRate) || t.orderRate) ?? 0),
+          0,
+        ),
       received: tr.received,
       receivedDate: tr.receivedDate,
       notes: tr.notes,
@@ -126,7 +133,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
           <Info label="Previsão" value={fmtDate(order.expectedDate)} tone={late ? "red" : undefined} />
           <Info label="Modalidade" value={order.transportMode?.name} />
           <Info label="Transportadora" value={order.carrier?.name} />
-          <Info label="Moeda" value={cur === "USD" ? "Dólar (US$)" : "Real (R$)"} />
+          <Info label="Moeda" value={cur === "USD" ? "Dólar ($)" : "Real (R$)"} />
           <Info label="Cotação do pedido" value={t.orderRate ? fmtMoney(t.orderRate) : "—"} />
           <Info label="Total de peças" value={fmtNumber(t.pieces, 0)} />
         </dl>
@@ -158,12 +165,22 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
             tone={t.pending > 0.01 ? "red" : "green"}
           />
           <Stat
-            label="Custos à parte (imposto/despesas)"
+            label="Imposto e despesas à parte"
             value={fmtMoney(t.extrasBRL)}
-            sub={t.extrasPendingBRL > 0 ? `Pendente: ${fmtMoney(t.extrasPendingBRL)}` : "Nada pendente"}
-            tone={t.extrasPendingBRL > 0 ? "amber" : undefined}
+            sub={
+              t.extrasPendingBRL > 0
+                ? `Despesas pendentes: ${fmtMoney(t.extrasPendingBRL)}`
+                : t.taxAwaiting
+                  ? "Imposto por fora ainda não lançado"
+                  : "Nada pendente"
+            }
+            tone={t.extrasPendingBRL > 0 || t.taxAwaiting ? "amber" : undefined}
           />
-          <Stat label="Imposto total" value={fmtMoney(t.taxTotalBRL)} sub="Pedido + pacotes" />
+          <Stat
+            label="Imposto"
+            value={order.taxMode === "sem" && t.taxTotalBRL === 0 ? "Sem imposto" : fmtMoney(t.taxTotalBRL)}
+            sub={TAX_MODE_LABEL[order.taxMode]}
+          />
           <Stat label="Custo total estimado" value={fmtMoney(t.landedBRL)} sub="Pagamentos + saldo + custos à parte" />
           <Stat
             label="Custo real por peça"
@@ -183,22 +200,6 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
             <Row label="Total ao fornecedor" value={fmtMoney(t.supplierTotal, cur)} bold />
           </tbody>
         </table>
-
-        {order.hasTax && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-3 text-sm">
-            <span>
-              Imposto do pedido: <strong>{fmtMoney(Number(order.taxAmount), cur)}</strong>{" "}
-              {order.taxIncluded ? "(incluso no valor do pedido)" : order.taxPaid ? "(pago à parte)" : "(a pagar à parte)"}
-            </span>
-            {!order.taxIncluded && (
-              <form action={toggleOrderTaxPaid}>
-                <input type="hidden" name="id" value={order.id} />
-                <input type="hidden" name="taxPaid" value={String(!order.taxPaid)} />
-                <button className={btnSmall}>{order.taxPaid ? "Marcar como pendente" : "Marcar como pago"}</button>
-              </form>
-            )}
-          </div>
-        )}
 
         {order.expenses.length > 0 && (
           <div className="mt-4">
@@ -279,6 +280,72 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
             suggestedAmount={t.pending > 0 ? toInput(t.pending) : ""}
           />
         </div>
+      </Card>
+
+      <Card title="Imposto">
+        <p className="text-sm">
+          <strong>{TAX_MODE_LABEL[order.taxMode]}</strong>
+          <span className="text-slate-500"> — {TAX_MODE_HINT[order.taxMode]}</span>
+        </p>
+        {order.taxMode === "incluso" && Number(order.taxAmount) > 0 && (
+          <p className="mt-2 text-sm">
+            Valor incluso: <strong>{fmtMoney(Number(order.taxAmount), cur)}</strong>{" "}
+            <span className="text-slate-500">{other(Number(order.taxAmount))}</span>
+          </p>
+        )}
+        {t.taxAwaiting && (
+          <p className="mt-2 rounded-md bg-orange-50 p-2 text-sm text-orange-800">
+            Imposto por fora ainda não lançado. Quando pagar, lance abaixo.
+          </p>
+        )}
+        {order.taxMode !== "incluso" && (
+          <>
+            {order.taxPayments.length > 0 && (
+              <ul className="mt-3 divide-y divide-slate-100 text-sm">
+                {order.taxPayments.map((tp) => (
+                  <li key={tp.id} className="flex flex-wrap items-start justify-between gap-2 py-2">
+                    <div>
+                      <div className="font-medium">
+                        {fmtDate(tp.paidOn)} · {fmtMoney(Number(tp.amount), tp.currency)}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {[
+                          tp.tracking ? `Pacote ${tp.tracking.code}` : "Pedido todo",
+                          tp.exchangeRate && tp.currency === "USD" ? `cotação ${fmtMoney(Number(tp.exchangeRate))}` : null,
+                          tp.notes,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    </div>
+                    {isAdmin && (
+                      <form action={deleteTaxPayment}>
+                        <input type="hidden" name="id" value={tp.id} />
+                        <input type="hidden" name="orderId" value={order.id} />
+                        <ConfirmButton className={`${btnSmall} text-red-600`} message="Excluir este lançamento de imposto?" />
+                      </form>
+                    )}
+                  </li>
+                ))}
+                <li className="flex justify-between py-2 font-semibold">
+                  <span>Total de imposto pago</span>
+                  <span>{fmtMoney(t.taxPaidBRL)}</span>
+                </li>
+              </ul>
+            )}
+            <details className="mt-3 rounded-lg bg-slate-50 p-3" open={t.taxAwaiting}>
+              <summary className="cursor-pointer text-sm font-semibold text-slate-700">Lançar imposto pago</summary>
+              <div className="mt-3">
+                <TaxPaymentForm
+                  orderId={order.id}
+                  today={today}
+                  todayRate={todayRate ? toInput(todayRate.rate) : toInput(order.exchangeRate)}
+                  trackings={order.trackings.map((tr) => ({ id: tr.id, code: tr.code, label: tr.label }))}
+                />
+              </div>
+            </details>
+          </>
+        )}
       </Card>
 
       <Card

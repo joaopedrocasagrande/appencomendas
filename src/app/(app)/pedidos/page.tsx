@@ -60,7 +60,15 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
     db.query.orders.findMany({
       where: and(...where),
       orderBy: [desc(orders.orderDate), desc(orders.id)],
-      with: { supplier: true, transportMode: true, items: true, expenses: true, trackings: true, payments: true },
+      with: {
+        supplier: true,
+        transportMode: true,
+        items: true,
+        expenses: true,
+        trackings: true,
+        payments: true,
+        taxPayments: true,
+      },
     }),
     loadOptions(),
   ]);
@@ -76,11 +84,14 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
     );
   }
   if (f.situacao === "atrasados") list = list.filter((x) => x.late);
+  if (f.situacao === "imposto") list = list.filter((x) => x.t.taxAwaiting);
 
   const pendingBy: Record<Currency, number> = { USD: 0, BRL: 0 };
   let pieces = 0;
   let extrasPending = 0;
+  let taxAwaiting = 0;
   for (const { t } of list) {
+    if (t.taxAwaiting) taxAwaiting++;
     if (t.pending > 0) pendingBy[t.currency] += t.pending;
     pieces += t.pieces;
     extrasPending += t.extrasPendingBRL;
@@ -150,6 +161,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
             <option value="">Qualquer situação</option>
             <option value="atrasados">Atrasados</option>
             <option value="revisao">Precisam de revisão</option>
+            <option value="imposto">Imposto por fora a lançar</option>
           </Select>
           <label className="text-xs text-slate-600">
             Pedido de
@@ -183,7 +195,12 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
           }
           tone="red"
         />
-        <Stat label="Impostos/despesas pendentes" value={fmtMoney(extrasPending)} tone="amber" />
+        <Stat
+          label="Despesas pendentes"
+          value={fmtMoney(extrasPending)}
+          sub={taxAwaiting ? `${taxAwaiting} pedido(s) com imposto a lançar` : undefined}
+          tone="amber"
+        />
       </div>
 
       {list.length === 0 ? (
@@ -231,6 +248,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
                       rastreios entregues
                     </Badge>
                   )}
+                  {t.taxAwaiting && <Badge className="bg-orange-100 text-orange-800">Imposto a lançar</Badge>}
                   {o.needsReview && <Badge className="bg-yellow-100 text-yellow-800">Revisar</Badge>}
                 </div>
               </Link>

@@ -89,6 +89,11 @@ export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export const CURRENCIES = ["USD", "BRL"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
+// sem: pedido sem imposto; incluso: já está no valor do pedido;
+// por_fora: pago depois, lançado em tax_payments.
+export const TAX_MODES = ["sem", "incluso", "por_fora"] as const;
+export type TaxMode = (typeof TAX_MODES)[number];
+
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -102,11 +107,9 @@ export const orders = pgTable("orders", {
   exchangeRate: rate("exchange_rate"),
   freight: money("freight").notNull().default("0"),
   discount: money("discount").notNull().default("0"),
-  hasTax: boolean("has_tax").notNull().default(false),
-  taxIncluded: boolean("tax_included").notNull().default(false),
+  taxMode: text("tax_mode", { enum: TAX_MODES }).notNull().default("sem"),
+  // Valor informativo quando o imposto está incluso no pedido (opcional).
   taxAmount: money("tax_amount").notNull().default("0"),
-  // Só relevante quando o imposto não está incluso (pago à parte).
-  taxPaid: boolean("tax_paid").notNull().default(false),
   status: text("status", { enum: ORDER_STATUSES }).notNull().default("confirmado"),
   notes: text("notes"),
   needsReview: boolean("needs_review").notNull().default(false),
@@ -178,9 +181,6 @@ export const trackings = pgTable("trackings", {
   // Conteúdo do pacote, ex.: "Internacional", "Grêmio"
   label: text("label"),
   status: text("status", { enum: TRACKING_STATUSES }).notNull().default("postado"),
-  taxAmount: money("tax_amount").notNull().default("0"),
-  taxCurrency: text("tax_currency", { enum: CURRENCIES }).notNull().default("BRL"),
-  taxPaid: boolean("tax_paid").notNull().default(false),
   // Conferência por pacote
   received: boolean("received").notNull().default(false),
   receivedDate: date("received_date"),
@@ -203,6 +203,22 @@ export const payments = pgTable("payments", {
   createdAt: createdAt(),
 });
 
+// Impostos pagos por fora, lançados depois de pagos (opcionalmente de um pacote).
+export const taxPayments = pgTable("tax_payments", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  trackingId: integer("tracking_id").references(() => trackings.id, { onDelete: "set null" }),
+  paidOn: date("paid_on").notNull(),
+  amount: money("amount").notNull(),
+  currency: text("currency", { enum: CURRENCIES }).notNull().default("BRL"),
+  exchangeRate: rate("exchange_rate"),
+  notes: text("notes"),
+  createdById: integer("created_by_id").references(() => users.id),
+  createdAt: createdAt(),
+});
+
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   supplier: one(suppliers, { fields: [orders.supplierId], references: [suppliers.id] }),
   transportMode: one(transportModes, {
@@ -214,6 +230,12 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   expenses: many(orderExpenses),
   trackings: many(trackings),
   payments: many(payments),
+  taxPayments: many(taxPayments),
+}));
+
+export const taxPaymentsRelations = relations(taxPayments, ({ one }) => ({
+  order: one(orders, { fields: [taxPayments.orderId], references: [orders.id] }),
+  tracking: one(trackings, { fields: [taxPayments.trackingId], references: [trackings.id] }),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({

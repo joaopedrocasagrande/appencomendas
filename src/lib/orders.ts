@@ -9,6 +9,7 @@ import {
   payments,
   products,
   suppliers,
+  taxPayments,
   transportModes,
 } from "@/db/schema";
 
@@ -48,6 +49,7 @@ export async function loadOrder(id: number) {
       expenses: true,
       trackings: { with: { carrier: true } },
       payments: { with: { method: true }, orderBy: [asc(payments.paidOn), asc(payments.id)] },
+      taxPayments: { with: { tracking: true }, orderBy: [asc(taxPayments.paidOn), asc(taxPayments.id)] },
     },
   });
 }

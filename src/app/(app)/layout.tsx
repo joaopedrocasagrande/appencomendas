@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               }
               title={rate ? `Cotação de ${fmtDate(rate.day)}` : "Nenhuma cotação cadastrada"}
             >
-              US$ 1 = {rate ? fmtMoney(rate.rate) : "definir"}
+              $1 = {rate ? fmtMoney(rate.rate) : "definir"}
               {rate && !isToday && " ⚠"}
             </Link>
             <span className="hidden text-slate-500 sm:inline">

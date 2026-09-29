@@ -5,31 +5,27 @@ import { btnPrimary, Field, Input, Select } from "@/components/ui";
 import { CURRENCIES, type Currency } from "@/db/schema";
 import { toInput } from "@/lib/format";
 import { rateForDay } from "../../cotacoes/actions";
-import { addPayment, type ActionResult } from "../actions";
+import { addTaxPayment, type ActionResult } from "../actions";
 
-export function PaymentForm({
+export function TaxPaymentForm({
   orderId,
-  orderCurrency,
   today,
   todayRate,
-  methods,
-  suggestedAmount,
+  trackings,
 }: {
   orderId: number;
-  orderCurrency: Currency;
   today: string;
   todayRate: string;
-  methods: string[];
-  suggestedAmount: string;
+  trackings: { id: number; code: string; label: string | null }[];
 }) {
   const [rate, setRate] = useState(todayRate);
-  const [currency, setCurrency] = useState<Currency>(orderCurrency);
+  const [currency, setCurrency] = useState<Currency>("BRL");
   const ref = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState(async (prev: ActionResult, fd: FormData) => {
-    const res = await addPayment(orderId, prev, fd);
+    const res = await addTaxPayment(orderId, prev, fd);
     if (res?.ok) {
       ref.current?.reset();
-      setCurrency(orderCurrency);
+      setCurrency("BRL");
       setRate(todayRate);
     }
     return res;
@@ -37,13 +33,8 @@ export function PaymentForm({
 
   return (
     <form ref={ref} action={action} className="space-y-3">
-      <datalist id="dl-methods">
-        {methods.map((m) => (
-          <option key={m} value={m} />
-        ))}
-      </datalist>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        <Field label="Data">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Field label="Data do pagamento">
           <Input
             type="date"
             name="paidOn"
@@ -56,7 +47,7 @@ export function PaymentForm({
           />
         </Field>
         <Field label="Valor pago">
-          <Input name="amount" inputMode="decimal" placeholder={suggestedAmount} required />
+          <Input name="amount" inputMode="decimal" required />
         </Field>
         <Field label="Moeda">
           <Select name="currency" value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>
@@ -65,19 +56,29 @@ export function PaymentForm({
             ))}
           </Select>
         </Field>
-        <Field label="Cotação ($1 = R$)">
-          <Input name="exchangeRate" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
+        {currency === "USD" && (
+          <Field label="Cotação ($1 = R$)">
+            <Input name="exchangeRate" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
+          </Field>
+        )}
+        <Field label="Referente a" className="col-span-2">
+          <Select name="trackingId" defaultValue="">
+            <option value="">Pedido todo</option>
+            {trackings.map((t) => (
+              <option key={t.id} value={t.id}>
+                Pacote {t.code}
+                {t.label ? ` (${t.label})` : ""}
+              </option>
+            ))}
+          </Select>
         </Field>
-        <Field label="Forma de pagamento" className="col-span-2 sm:col-span-1">
-          <Input name="method" list="dl-methods" placeholder="PIX, Wise..." />
-        </Field>
-        <Field label="Observação" className="col-span-2 sm:col-span-5">
+        <Field label="Observação" className="col-span-2">
           <Input name="notes" />
         </Field>
       </div>
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
       <button className={btnPrimary} disabled={pending}>
-        {pending ? "Lançando..." : "Lançar pagamento"}
+        {pending ? "Lançando..." : "Lançar imposto"}
       </button>
     </form>
   );

@@ -40,8 +40,10 @@ Após alterar `src/db/schema.ts`, gere a migração com `npm run db:generate`.
 ## Regras de cálculo
 
 - **Total ao fornecedor** = produtos + frete − desconto + despesas marcadas como "cobradas pelo fornecedor".
-- **Imposto incluso no pedido**: já está dentro do valor (fica apenas informativo).
-  **Não incluso**: é custo à parte, com controle de pago/pendente. Impostos por pacote ficam em cada rastreio.
+- **Imposto** (por pedido): *Sem imposto*, *Incluso no pedido* (já está no valor; o valor é
+  opcional e só informativo) ou *Pago por fora* (lançado depois de pago, em "Lançar imposto pago",
+  podendo ser do pedido todo ou de um pacote/rastreio). Pedidos por fora sem lançamento ficam
+  marcados como "Imposto a lançar".
 - **Pagamentos** podem ser em US$ ou R$; cada um guarda a própria cotação e é convertido para a
   moeda do pedido para calcular o saldo.
 - **Custo real por peça** = (pagamentos em R$ + saldo pela cotação do pedido + custos à parte) ÷ peças.

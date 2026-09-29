@@ -11,7 +11,7 @@ export function RateForm({ today, current }: { today: string; current?: string }
       <Field label="Dia" className="w-44">
         <Input type="date" name="day" defaultValue={today} required />
       </Field>
-      <Field label="US$ 1 = R$" className="w-36">
+      <Field label="$1 = R$" className="w-36">
         <Input name="rate" inputMode="decimal" placeholder="5,42" defaultValue={current} required />
       </Field>
       <button className={btnPrimary} disabled={pending}>

@@ -13,10 +13,16 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
-import { CURRENCIES, ORDER_STATUSES, type Currency } from "@/db/schema";
+import { CURRENCIES, ORDER_STATUSES, TAX_MODES, type Currency } from "@/db/schema";
 import { computeOrderTotals, otherCurrency } from "@/lib/finance";
 import { addDays, fmtMoney, fmtNumber, parseDecimal, toInput } from "@/lib/format";
-import { ORDER_STATUS_LABEL, SIZE_SUGGESTIONS, VARIANT_SUGGESTIONS } from "@/lib/labels";
+import {
+  ORDER_STATUS_LABEL,
+  SIZE_SUGGESTIONS,
+  TAX_MODE_HINT,
+  TAX_MODE_LABEL,
+  VARIANT_SUGGESTIONS,
+} from "@/lib/labels";
 import type { Options } from "@/lib/orders";
 import { rateForDay } from "../cotacoes/actions";
 import { saveOrder } from "./actions";
@@ -95,10 +101,8 @@ export function OrderForm({
       exchangeRate: defaultRate,
       freight: "",
       discount: "",
-      hasTax: false,
-      taxIncluded: false,
+      taxMode: "sem",
       taxAmount: "",
-      taxPaid: false,
       status: "confirmado",
       notes: "",
       needsReview: false,
@@ -164,10 +168,8 @@ export function OrderForm({
         exchangeRate: rate,
         freight: parseDecimal(form.freight),
         discount: parseDecimal(form.discount),
-        hasTax: !!form.hasTax,
-        taxIncluded: !!form.taxIncluded,
+        taxMode: form.taxMode,
         taxAmount: parseDecimal(form.taxAmount),
-        taxPaid: !!form.taxPaid,
         items: items.map((i) => ({
           totalPieces: parseDecimal(i.totalPieces) ?? 0,
           unitPrice: parseDecimal(i.unitPrice),
@@ -178,7 +180,7 @@ export function OrderForm({
           chargedBySupplier: e.chargedBySupplier,
           paid: e.paid,
         })),
-        trackings: [],
+        taxPayments: [],
         payments: [],
       }),
     [form, items, expenses, cur, rate],
@@ -320,12 +322,12 @@ export function OrderForm({
             <Select value={form.currency} onChange={(e) => set("currency", e.target.value as Currency)}>
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
-                  {c === "USD" ? "Dólar (US$)" : "Real (R$)"}
+                  {c === "USD" ? "Dólar ($)" : "Real (R$)"}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label="Cotação do pedido (US$ 1 = R$)" hint="Sugerida pela cotação do dia do pedido.">
+          <Field label="Cotação do pedido ($1 = R$)" hint="Sugerida pela cotação do dia do pedido.">
             <Input
               inputMode="decimal"
               value={form.exchangeRate}
@@ -378,47 +380,34 @@ export function OrderForm({
           </Field>
         </div>
         <div className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
-            <input
-              type="checkbox"
-              className="size-4"
-              checked={!!form.hasTax}
-              onChange={(e) => set("hasTax", e.target.checked)}
-            />
-            Este pedido tem imposto
-          </label>
-          {form.hasTax && (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label={`Valor do imposto (${cur})`}>
-                <Input inputMode="decimal" value={form.taxAmount} onChange={(e) => set("taxAmount", e.target.value)} />
-              </Field>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+          <span className="block text-sm font-medium text-slate-800">Imposto</span>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {TAX_MODES.map((m) => (
+              <label
+                key={m}
+                className={cx(
+                  "flex cursor-pointer items-start gap-2 rounded-lg border bg-white p-3 text-sm",
+                  form.taxMode === m ? "border-blue-500 ring-2 ring-blue-100" : "border-slate-200",
+                )}
+              >
                 <input
-                  type="checkbox"
-                  className="size-4"
-                  checked={!!form.taxIncluded}
-                  onChange={(e) => set("taxIncluded", e.target.checked)}
+                  type="radio"
+                  name="taxMode"
+                  className="mt-0.5 size-4"
+                  checked={form.taxMode === m}
+                  onChange={() => set("taxMode", m)}
                 />
-                Imposto incluso no valor do pedido
+                <span>
+                  <span className="block font-medium text-slate-800">{TAX_MODE_LABEL[m]}</span>
+                  <span className="block text-xs text-slate-500">{TAX_MODE_HINT[m]}</span>
+                </span>
               </label>
-              {!form.taxIncluded && (
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    className="size-4"
-                    checked={!!form.taxPaid}
-                    onChange={(e) => set("taxPaid", e.target.checked)}
-                  />
-                  Imposto já pago
-                </label>
-              )}
-              <p className="text-xs text-slate-500 sm:col-span-3">
-                {form.taxIncluded
-                  ? "Incluso: o imposto já está dentro do valor pago ao fornecedor (fica só como informação)."
-                  : "Não incluso: o imposto é pago à parte e entra nos custos extras do pedido."}{" "}
-                Impostos cobrados por pacote podem ser lançados em cada rastreio.
-              </p>
-            </div>
+            ))}
+          </div>
+          {form.taxMode === "incluso" && (
+            <Field label={`Valor do imposto incluso (${cur}) — opcional`} className="sm:w-1/3">
+              <Input inputMode="decimal" value={form.taxAmount} onChange={(e) => set("taxAmount", e.target.value)} />
+            </Field>
           )}
         </div>
       </Card>
@@ -525,7 +514,7 @@ export function OrderForm({
             <div className="text-xs text-slate-500">{other(totals.supplierTotal)}</div>
           </div>
           <div>
-            <div className="text-xs text-slate-500">Custos à parte</div>
+            <div className="text-xs text-slate-500">Despesas à parte</div>
             <div className="font-semibold">{fmtMoney(totals.extrasBRL, "BRL")}</div>
           </div>
         </div>

@@ -7,7 +7,9 @@ const moneyFmt: Record<Currency, Intl.NumberFormat> = {
 
 export function fmtMoney(value: number | null | undefined, currency: Currency = "BRL") {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  return moneyFmt[currency].format(value);
+  // Dólar exibido só com "$" (ex.: $ 1.234,56)
+  const text = moneyFmt[currency].format(value);
+  return currency === "USD" ? text.replace("US$", "$") : text;
 }
 
 export function fmtNumber(value: number | null | undefined, maxDecimals = 2) {

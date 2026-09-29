@@ -53,10 +53,8 @@ CREATE TABLE "orders" (
 	"exchange_rate" numeric(12, 4),
 	"freight" numeric(14, 2) DEFAULT '0' NOT NULL,
 	"discount" numeric(14, 2) DEFAULT '0' NOT NULL,
-	"has_tax" boolean DEFAULT false NOT NULL,
-	"tax_included" boolean DEFAULT false NOT NULL,
+	"tax_mode" text DEFAULT 'sem' NOT NULL,
 	"tax_amount" numeric(14, 2) DEFAULT '0' NOT NULL,
-	"tax_paid" boolean DEFAULT false NOT NULL,
 	"status" text DEFAULT 'confirmado' NOT NULL,
 	"notes" text,
 	"needs_review" boolean DEFAULT false NOT NULL,
@@ -102,6 +100,19 @@ CREATE TABLE "suppliers" (
 	CONSTRAINT "suppliers_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
+CREATE TABLE "tax_payments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"order_id" integer NOT NULL,
+	"tracking_id" integer,
+	"paid_on" date NOT NULL,
+	"amount" numeric(14, 2) NOT NULL,
+	"currency" text DEFAULT 'BRL' NOT NULL,
+	"exchange_rate" numeric(12, 4),
+	"notes" text,
+	"created_by_id" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "trackings" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"order_id" integer NOT NULL,
@@ -109,9 +120,6 @@ CREATE TABLE "trackings" (
 	"carrier_id" integer,
 	"label" text,
 	"status" text DEFAULT 'postado' NOT NULL,
-	"tax_amount" numeric(14, 2) DEFAULT '0' NOT NULL,
-	"tax_currency" text DEFAULT 'BRL' NOT NULL,
-	"tax_paid" boolean DEFAULT false NOT NULL,
 	"received" boolean DEFAULT false NOT NULL,
 	"received_date" date,
 	"notes" text,
@@ -147,5 +155,8 @@ ALTER TABLE "orders" ADD CONSTRAINT "orders_created_by_id_users_id_fk" FOREIGN K
 ALTER TABLE "payments" ADD CONSTRAINT "payments_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_payment_method_id_payment_methods_id_fk" FOREIGN KEY ("payment_method_id") REFERENCES "public"."payment_methods"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_created_by_id_users_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tax_payments" ADD CONSTRAINT "tax_payments_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tax_payments" ADD CONSTRAINT "tax_payments_tracking_id_trackings_id_fk" FOREIGN KEY ("tracking_id") REFERENCES "public"."trackings"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tax_payments" ADD CONSTRAINT "tax_payments_created_by_id_users_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "trackings" ADD CONSTRAINT "trackings_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "trackings" ADD CONSTRAINT "trackings_carrier_id_carriers_id_fk" FOREIGN KEY ("carrier_id") REFERENCES "public"."carriers"("id") ON DELETE no action ON UPDATE no action;
