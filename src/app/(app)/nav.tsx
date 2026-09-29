@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cx } from "@/components/ui";
 
 const LINKS = [
+  { href: "/painel", label: "Painel", icon: "📊" },
   { href: "/pedidos", label: "Pedidos", icon: "📦" },
   { href: "/pedidos/novo", label: "Novo", icon: "➕" },
   { href: "/cotacoes", label: "Dólar", icon: "💵" },
@@ -39,7 +40,7 @@ export function DesktopNav() {
 export function MobileNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
       {LINKS.map((l) => (
         <Link
           key={l.href}

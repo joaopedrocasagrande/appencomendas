@@ -14,6 +14,12 @@ import {
   type PaymentStatus,
 } from "@/lib/labels";
 import { loadOptions } from "@/lib/orders";
+import {
+  computeReceipt,
+  RECEIPT_STATUS_COLOR,
+  RECEIPT_STATUS_LABEL,
+  type ReceiptStatus,
+} from "@/lib/receiving";
 
 const CLOSED: OrderStatus[] = ["recebido", "finalizado", "cancelado"];
 
@@ -31,6 +37,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
     de: get("de"),
     ate: get("ate"),
     situacao: get("situacao"),
+    recebimento: get("recebimento"),
   };
   const today = todayISO();
 
@@ -77,7 +84,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
     o,
     t: computeOrderTotals(o),
     late: !!o.expectedDate && o.expectedDate < today && !CLOSED.includes(o.status),
+    r: computeReceipt(o.items, o.trackings),
   }));
+  if (f.recebimento) list = list.filter((x) => x.r.status === f.recebimento);
   if (f.pagamento) {
     list = list.filter(({ t }) =>
       f.pagamento === "em_aberto" ? t.pending > 0.01 : t.paymentStatus === (f.pagamento as PaymentStatus),
@@ -163,6 +172,14 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
             <option value="revisao">Precisam de revisão</option>
             <option value="imposto">Imposto por fora a lançar</option>
           </Select>
+          <Select name="recebimento" defaultValue={f.recebimento}>
+            <option value="">Qualquer recebimento</option>
+            {(Object.keys(RECEIPT_STATUS_LABEL) as ReceiptStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {RECEIPT_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </Select>
           <label className="text-xs text-slate-600">
             Pedido de
             <Input type="date" name="de" defaultValue={f.de} />
@@ -209,7 +226,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
         </Card>
       ) : (
         <ul className="space-y-2">
-          {list.map(({ o, t, late }) => (
+          {list.map(({ o, t, late, r }) => (
             <li key={o.id}>
               <Link
                 href={`/pedidos/${o.id}`}
@@ -241,6 +258,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
                 <div className="mt-2 flex flex-wrap gap-1">
                   <Badge className={ORDER_STATUS_COLOR[o.status]}>{ORDER_STATUS_LABEL[o.status]}</Badge>
                   <Badge className={PAYMENT_STATUS_COLOR[t.paymentStatus]}>{PAYMENT_STATUS_LABEL[t.paymentStatus]}</Badge>
+                  {r.status !== "nao_recebido" && (
+                    <Badge className={RECEIPT_STATUS_COLOR[r.status]}>{RECEIPT_STATUS_LABEL[r.status]}</Badge>
+                  )}
                   <Badge className="bg-slate-100 text-slate-700">{fmtNumber(t.pieces, 0)} peças</Badge>
                   {o.trackings.length > 0 && (
                     <Badge className="bg-slate-100 text-slate-700">

@@ -138,6 +138,8 @@ export const orderItems = pgTable("order_items", {
   sizes: jsonb("sizes").$type<SizeBreakdown>(),
   // Conferência no recebimento
   receivedQty: integer("received_qty"),
+  // Quantidade recebida por tamanho (quando o item controla tamanhos)
+  receivedSizes: jsonb("received_sizes").$type<SizeBreakdown>(),
   defectiveQty: integer("defective_qty"),
   checkNotes: text("check_notes"),
   position: integer("position").notNull().default(0),
