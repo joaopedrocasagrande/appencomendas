@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -119,7 +120,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
           <span>Este pedido foi marcado para revisão. Confira os dados e desmarque quando estiver certo.</span>
           <form action={markReviewed}>
             <input type="hidden" name="id" value={order.id} />
-            <button className={btnSmall}>Marcar como revisado</button>
+            <SubmitButton className={btnSmall}>Marcar como revisado</SubmitButton>
           </form>
         </div>
       )}
@@ -153,7 +154,9 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
               ))}
             </Select>
           </label>
-          <button className={btnSecondary}>Atualizar status</button>
+          <SubmitButton className={btnSecondary} pendingText="Atualizando...">
+            Atualizar status
+          </SubmitButton>
         </form>
         {order.notes && <p className="mt-3 whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-sm">{order.notes}</p>}
       </Card>
@@ -224,7 +227,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
                         <input type="hidden" name="id" value={e.id} />
                         <input type="hidden" name="orderId" value={order.id} />
                         <input type="hidden" name="paid" value={String(!e.paid)} />
-                        <button className={btnSmall}>{e.paid ? "Desmarcar pago" : "Marcar pago"}</button>
+                        <SubmitButton className={btnSmall}>{e.paid ? "Desmarcar pago" : "Marcar pago"}</SubmitButton>
                       </form>
                     )}
                   </span>

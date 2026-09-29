@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { fmtDate, fmtMoney, todayISO } from "@/lib/format";
@@ -40,7 +41,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               {user.role === "admin" ? " (admin)" : ""}
             </span>
             <form action={logout}>
-              <button className="text-slate-500 hover:text-slate-800">Sair</button>
+              <SubmitButton className="text-slate-500 hover:text-slate-800" pendingText="Saindo...">
+                Sair
+              </SubmitButton>
             </form>
           </div>
         </div>

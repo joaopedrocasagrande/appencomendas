@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useActionState, useEffect, useRef, useState } from "react";
 import {
   Badge,
@@ -161,9 +162,9 @@ export function TrackingsPanel({
             <Select name="status" className="w-auto" defaultValue="em_transito">
               <StatusOptions />
             </Select>
-            <button className={btnSmall} disabled={!selected.size}>
+            <SubmitButton className={btnSmall} disabled={!selected.size} pendingText="Aplicando...">
               Aplicar status
-            </button>
+            </SubmitButton>
           </form>
 
           <ul className="divide-y divide-slate-100">
@@ -269,7 +270,7 @@ function TrackingRow({
           {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
           <div className="flex justify-between gap-2">
             <button className={btnPrimary} disabled={pending}>
-              Salvar
+              {pending ? "Salvando..." : "Salvar"}
             </button>
             <button
               formAction={deleteTracking}

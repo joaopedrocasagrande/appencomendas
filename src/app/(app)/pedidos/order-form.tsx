@@ -222,7 +222,6 @@ export function OrderForm({
         if (res.error) setError(res.error);
         else if (res.id) {
           router.push(`/pedidos/${res.id}`);
-          router.refresh();
         }
       } catch {
         setError("Não foi possível salvar. Verifique sua conexão e tente novamente.");
