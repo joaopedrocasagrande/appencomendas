@@ -1,5 +1,5 @@
 import { desc } from "drizzle-orm";
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import type { ReactNode } from "react";
 import { db } from "@/db";
 import { orders, type Currency, type OrderStatus } from "@/db/schema";
@@ -59,14 +59,14 @@ export default async function DashboardPage() {
       <PageHeader
         title="Painel"
         actions={
-          <Link prefetch={false} href="/pedidos/novo" className={btnPrimary}>
+          <Link href="/pedidos/novo" className={btnPrimary}>
             + Novo pedido
           </Link>
         }
       />
 
       {!rate || rate.day !== today ? (
-        <Link prefetch={false} href="/cotacoes" className="block rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <Link href="/cotacoes" className="block rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           A cotação do dólar de hoje ainda não foi definida
           {rate ? ` (usando a de ${fmtDate(rate.day)})` : ""}. Toque aqui para definir.
         </Link>
@@ -138,8 +138,7 @@ export default async function DashboardPage() {
             <ul className="divide-y divide-slate-100 text-sm">
               {supplierList.map((s) => (
                 <li key={s.name}>
-                  <Link prefetch={false}
-                    href={s.id ? `/pedidos?fornecedor=${s.id}&pagamento=em_aberto` : "/pedidos?pagamento=em_aberto"}
+                  <Link href={s.id ? `/pedidos?fornecedor=${s.id}&pagamento=em_aberto` : "/pedidos?pagamento=em_aberto"}
                     className="flex items-center justify-between gap-2 py-2 hover:bg-slate-50"
                   >
                     <span className="font-medium">{s.name}</span>
@@ -176,7 +175,7 @@ export default async function DashboardPage() {
 
 function TileLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link prefetch={false} href={href} className="block h-full rounded-lg bg-white shadow-sm ring-1 ring-slate-200 hover:ring-blue-300 [&>div]:h-full">
+    <Link href={href} className="block h-full rounded-lg bg-white shadow-sm ring-1 ring-slate-200 hover:ring-blue-300 [&>div]:h-full">
       {children}
     </Link>
   );
@@ -194,7 +193,7 @@ function OrderList({ rows, empty, right }: { rows: Row[]; empty: string; right: 
     <ul className="divide-y divide-slate-100 text-sm">
       {rows.slice(0, 12).map((row) => (
         <li key={row.o.id}>
-          <Link prefetch={false} href={`/pedidos/${row.o.id}`} className="flex items-start justify-between gap-2 py-2 hover:bg-slate-50">
+          <Link href={`/pedidos/${row.o.id}`} className="flex items-start justify-between gap-2 py-2 hover:bg-slate-50">
             <span className="min-w-0">
               <span className="block truncate font-medium">
                 <span className="text-slate-400">#{row.o.id}</span> {row.o.title}

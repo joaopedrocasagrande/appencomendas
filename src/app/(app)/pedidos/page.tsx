@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { ORDER_STATUSES, type Currency } from "@/db/schema";
 import { Badge, btnPrimary, btnSecondary, Card, EmptyState, Input, PageHeader, Select, Stat } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
@@ -45,7 +45,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
             >
               ⬇ Excel
             </a>
-            <Link prefetch={false} href="/pedidos/novo" className={btnPrimary}>
+            <Link href="/pedidos/novo" className={btnPrimary}>
               + Novo pedido
             </Link>
           </>
@@ -125,7 +125,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
           <div className="flex items-end gap-2 sm:col-span-2">
             <button className={btnPrimary}>Filtrar</button>
             {hasFilters && (
-              <Link prefetch={false} href="/pedidos" className={btnSecondary}>
+              <Link href="/pedidos" className={btnSecondary}>
                 Limpar
               </Link>
             )}
@@ -162,8 +162,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/pedidos">
         <ul className="space-y-2">
           {list.map(({ o, t, late, r }) => (
             <li key={o.id}>
-              <Link prefetch={false}
-                href={`/pedidos/${o.id}`}
+              <Link href={`/pedidos/${o.id}`}
                 className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-blue-300"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
