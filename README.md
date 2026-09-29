@@ -1,49 +1,68 @@
-# Encomendas
+# Encomendas — GitHub Pages + Supabase
 
-App web para gerenciar pedidos sob encomenda (China): pedidos, itens, grades/caixas, tamanhos,
-frete, desconto, imposto, outras despesas, pagamentos parciais em US$ ou R$, cotação do dólar
-do dia, rastreios (vários por pedido) e filtros.
+Este diretório já é o site completo. Ele usa somente HTML, CSS e JavaScript no navegador. O Supabase continua sendo o banco de dados e também passa a cuidar do login.
 
-Stack: Next.js 16 + Postgres (Supabase) + Drizzle ORM. Hospedagem gratuita no Vercel.
+## 1. Fazer a segurança no Supabase
 
-## Colocar no ar (custo zero)
+1. Entre em https://supabase.com/dashboard e abra o projeto usado pelo app antigo.
+2. No menu esquerdo, abra **SQL Editor** e clique em **New query**.
+3. Abra o arquivo `supabase-setup.sql` desta pasta, copie tudo, cole no editor e clique em **Run**.
+4. Uma mensagem de sucesso deve aparecer. O script não apaga nem renomeia tabelas ou dados.
 
-1. **Supabase** (banco de dados) — crie uma conta em https://supabase.com e um projeto novo
-   (região *South America (São Paulo)*). Guarde a senha do banco.
-   - Em **Project Settings → Database → Connection string**, copie:
-     - *Transaction pooler* (porta 6543) → será o `DATABASE_URL`
-     - *Session pooler* (porta 5432) → será o `DIRECT_URL`
-   - Troque `[YOUR-PASSWORD]` pela senha do banco.
-2. **Vercel** (hospedagem) — crie uma conta em https://vercel.com usando o GitHub e importe
-   este repositório. Em **Environment Variables**, cadastre:
-   - `DATABASE_URL`
-   - `DIRECT_URL`
-   - `AUTH_SECRET` — uma frase aleatória longa (mínimo 16 caracteres)
-3. Clique em **Deploy**. As tabelas do banco são criadas automaticamente no build.
-4. Abra o endereço gerado: no primeiro acesso o app pede para criar o **administrador**.
-5. No celular, abra o endereço e use "Adicionar à tela inicial" para usar como app.
+## 2. Criar os usuários
 
-> O plano gratuito do Supabase pausa o projeto após ~7 dias sem nenhum acesso. Basta entrar no
-> painel do Supabase e clicar em "Restore"; os dados não são perdidos.
+1. No Supabase, abra **Authentication > Users**.
+2. Clique em **Add user > Create new user**.
+3. Informe seu e-mail e uma senha forte. Marque para o e-mail já ficar confirmado.
+4. Repita para cada funcionário.
+5. Volte ao **SQL Editor**. Para tornar você administrador, rode:
 
-## Desenvolvimento local
-
-```bash
-cp .env.example .env   # ajuste DATABASE_URL para um Postgres local
-npm install
-npm run db:migrate
-npm run dev
+```sql
+insert into public.app_profiles (user_id, nome, papel)
+select id, 'João', 'administrador'
+from auth.users
+where email = 'SEU_EMAIL_AQUI'
+on conflict (user_id) do update
+set nome = excluded.nome, papel = excluded.papel;
 ```
 
-Após alterar `src/db/schema.ts`, gere a migração com `npm run db:generate`.
+6. Para cadastrar um funcionário, troque nome, e-mail e papel:
 
-## Regras de cálculo
+```sql
+insert into public.app_profiles (user_id, nome, papel)
+select id, 'Nome do funcionário', 'funcionario'
+from auth.users
+where email = 'EMAIL_DO_FUNCIONARIO'
+on conflict (user_id) do update
+set nome = excluded.nome, papel = excluded.papel;
+```
 
-- **Total ao fornecedor** = produtos + frete − desconto + despesas marcadas como "cobradas pelo fornecedor".
-- **Imposto** (por pedido): *Sem imposto*, *Incluso no pedido* (já está no valor; o valor é
-  opcional e só informativo) ou *Pago por fora* (lançado depois de pago, em "Lançar imposto pago",
-  podendo ser do pedido todo ou de um pacote/rastreio). Pedidos por fora sem lançamento ficam
-  marcados como "Imposto a lançar".
-- **Pagamentos** podem ser em US$ ou R$; cada um guarda a própria cotação e é convertido para a
-  moeda do pedido para calcular o saldo.
-- **Custo real por peça** = (pagamentos em R$ + saldo pela cotação do pedido + custos à parte) ÷ peças.
+O app antigo usava a tabela `users`. Ela permanece intacta, mas não participa mais do login.
+
+## 3. Colocar a URL e a chave pública
+
+1. No Supabase, abra **Project Settings** (ícone de engrenagem).
+2. Abra **Data API** ou **API Settings** (o nome pode variar).
+3. Copie a **Project URL**.
+4. Copie a chave **Publishable key**. Em projetos antigos, use a chave **anon public**.
+5. Abra `config.js` e substitua os dois textos entre aspas.
+
+Use somente a chave publishable/anon. Nunca coloque a senha do banco ou a chave `service_role` no site.
+
+## 4. Publicar no GitHub Pages
+
+1. Entre em https://github.com/joaopedrocasagrande/appencomendas.
+2. Se o repositório ainda estiver vazio, clique em **uploading an existing file**. Se já tiver arquivos, clique em **Add file > Upload files**.
+3. Arraste **todos os arquivos desta pasta**, sem incluir a pasta por fora: `index.html`, `styles.css`, `app.js`, `config.js`, `supabase-setup.sql` e `README.md`.
+4. Clique em **Commit changes**.
+5. No repositório, abra **Settings > Pages**.
+6. Em **Build and deployment**, escolha **Deploy from a branch**. Selecione a branch `main`, pasta `/(root)` e clique em **Save**.
+7. Aguarde alguns minutos. O endereço será:
+
+https://joaopedrocasagrande.github.io/appencomendas/
+
+No celular, abra esse endereço no navegador. No iPhone, use **Compartilhar > Adicionar à Tela de Início**. No Android/Chrome, use o menu **⋮ > Adicionar à tela inicial**.
+
+## Teste sem banco
+
+Para apenas conhecer a interface, acrescente `?demo=1` ao fim do endereço. Esse modo usa dados fictícios no navegador e não acessa o Supabase.
