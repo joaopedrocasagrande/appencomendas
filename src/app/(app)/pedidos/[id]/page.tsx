@@ -7,12 +7,14 @@ import {
   btnSecondary,
   btnSmall,
   Card,
+  cx,
   EmptyState,
   PageHeader,
   Select,
   Stat,
 } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
+import { computeReceipt, RECEIPT_STATUS_COLOR, RECEIPT_STATUS_LABEL } from "@/lib/receiving";
 import { ORDER_STATUSES } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { computeOrderTotals, convert, otherCurrency } from "@/lib/finance";
@@ -50,6 +52,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
 
   const today = todayISO();
   const t = computeOrderTotals(order);
+  const r = computeReceipt(order.items, order.trackings);
   const cur = order.currency;
   const other = (v: number) => {
     const o = otherCurrency(v, cur, t.orderRate);
@@ -106,6 +109,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
       <div className="flex flex-wrap gap-2">
         <Badge className={ORDER_STATUS_COLOR[order.status]}>{ORDER_STATUS_LABEL[order.status]}</Badge>
         <Badge className={PAYMENT_STATUS_COLOR[t.paymentStatus]}>{PAYMENT_STATUS_LABEL[t.paymentStatus]}</Badge>
+        <Badge className={RECEIPT_STATUS_COLOR[r.status]}>{RECEIPT_STATUS_LABEL[r.status]}</Badge>
         {late && <Badge className="bg-red-100 text-red-700">Atrasado</Badge>}
         {order.needsReview && <Badge className="bg-yellow-100 text-yellow-800">Precisa de revisão</Badge>}
       </div>
@@ -385,6 +389,12 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
                 <div className="mt-1 flex justify-between tabular">
                   <span>
                     {fmtNumber(i.totalPieces, 0)} pç × {fmtMoney(Number(i.unitPrice), cur)}
+                    {i.receivedQty !== null && (
+                      <span className={i.receivedQty === i.totalPieces ? " text-green-700" : " text-amber-700"}>
+                        {" "}
+                        · receb. {i.receivedQty}
+                      </span>
+                    )}
                   </span>
                   <strong>{fmtMoney(i.totalPieces * Number(i.unitPrice), cur)}</strong>
                 </div>
@@ -403,6 +413,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
                   <th className="px-2 text-right">Caixas</th>
                   <th className="px-2 text-right">Grades</th>
                   <th className="px-2 text-right">Peças</th>
+                  <th className="px-2 text-right">Receb.</th>
                   <th className="px-2 text-right">Unit.</th>
                   <th className="pl-2 text-right">Total</th>
                 </tr>
@@ -434,6 +445,19 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
                     <td className="px-2 text-right">{i.boxes ? fmtNumber(Number(i.boxes)) : "—"}</td>
                     <td className="px-2 text-right">{i.grids ? fmtNumber(Number(i.grids)) : "—"}</td>
                     <td className="px-2 text-right font-medium">{fmtNumber(i.totalPieces, 0)}</td>
+                    <td
+                      className={cx(
+                        "px-2 text-right",
+                        i.receivedQty === null
+                          ? "text-slate-400"
+                          : i.receivedQty === i.totalPieces && !i.defectiveQty
+                            ? "text-green-700"
+                            : "text-amber-700",
+                      )}
+                    >
+                      {i.receivedQty === null ? "—" : fmtNumber(i.receivedQty, 0)}
+                      {i.defectiveQty ? <div className="text-xs text-red-600">{i.defectiveQty} def.</div> : null}
+                    </td>
                     <td className="px-2 text-right">{fmtMoney(Number(i.unitPrice), cur)}</td>
                     <td className="pl-2 text-right font-medium">
                       {fmtMoney(i.totalPieces * Number(i.unitPrice), cur)}
@@ -447,6 +471,7 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
                   <td />
                   <td />
                   <td className="px-2 text-right">{fmtNumber(t.pieces, 0)}</td>
+                  <td className="px-2 text-right">{r.received ? fmtNumber(r.received, 0) : "—"}</td>
                   <td />
                   <td className="pl-2 text-right">{fmtMoney(t.itemsTotal, cur)}</td>
                 </tr>
@@ -454,6 +479,43 @@ export default async function OrderPage({ params }: PageProps<"/pedidos/[id]">) 
             </table>
           </div>
           </>
+        )}
+      </Card>
+
+      <Card
+        title="Recebimento"
+        actions={
+          <Link href={`/pedidos/${order.id}/conferencia`} className={btnPrimary}>
+            Conferir recebimento
+          </Link>
+        }
+      >
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+          <Stat label="Situação" value={RECEIPT_STATUS_LABEL[r.status]} />
+          <Stat label="Peças esperadas" value={fmtNumber(r.expected, 0)} />
+          <Stat
+            label="Peças recebidas"
+            value={fmtNumber(r.received, 0)}
+            tone={r.received === 0 ? undefined : r.received < r.expected ? "amber" : "green"}
+          />
+          <Stat label="Faltando" value={fmtNumber(r.missing, 0)} tone={r.missing > 0 && r.received > 0 ? "amber" : undefined} />
+          <Stat label="Com defeito" value={fmtNumber(r.defective, 0)} tone={r.defective > 0 ? "red" : undefined} />
+        </div>
+        {r.packagesTotal > 0 && (
+          <p className="mt-2 text-sm text-slate-600">
+            Pacotes recebidos: {r.packagesReceived} de {r.packagesTotal}
+          </p>
+        )}
+        {order.items.some((i) => i.checkNotes) && (
+          <ul className="mt-2 space-y-1 text-sm">
+            {order.items
+              .filter((i) => i.checkNotes)
+              .map((i) => (
+                <li key={i.id} className="rounded-md bg-amber-50 px-2 py-1 text-amber-900">
+                  <strong>{i.product.name}:</strong> {i.checkNotes}
+                </li>
+              ))}
+          </ul>
         )}
       </Card>
 

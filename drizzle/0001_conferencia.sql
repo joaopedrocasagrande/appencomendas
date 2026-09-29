@@ -1,0 +1,1 @@
+ALTER TABLE "order_items" ADD COLUMN "received_sizes" jsonb;

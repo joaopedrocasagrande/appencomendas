@@ -400,3 +400,85 @@ export async function deleteTracking(formData: FormData) {
   await db.delete(trackings).where(and(eq(trackings.id, id), eq(trackings.orderId, orderId)));
   revalidateOrder(orderId);
 }
+
+// ---------------- Conferência do recebimento ----------------
+
+export type ConferenceInput = {
+  items: {
+    id: number;
+    receivedQty: string;
+    defectiveQty: string;
+    checkNotes: string;
+    receivedSizes: Record<string, string> | null;
+  }[];
+  trackings: { id: number; received: boolean; receivedDate: string }[];
+  updateStatus: boolean;
+};
+
+const AUTO_STATUS_FROM: OrderStatus[] = ["cotacao", "confirmado", "em_producao", "enviado", "recebido_parcial", "recebido"];
+
+export async function saveConference(orderId: number, input: ConferenceInput): Promise<{ error?: string }> {
+  await assertUser();
+  const order = await db.query.orders.findFirst({
+    where: eq(orders.id, orderId),
+    with: { items: true, trackings: true },
+  });
+  if (!order) return { error: "Pedido não encontrado." };
+
+  const intOrNull = (v: string) => {
+    const n = parseDecimal(v);
+    return n === null ? null : Math.max(0, Math.round(n));
+  };
+
+  const itemIds = new Set(order.items.map((i) => i.id));
+  const trackingIds = new Set(order.trackings.map((t) => t.id));
+
+  await db.transaction(async (tx) => {
+    for (const it of input.items) {
+      if (!itemIds.has(it.id)) continue;
+      let receivedSizes: SizeBreakdown | null = null;
+      if (it.receivedSizes) {
+        receivedSizes = {};
+        for (const [size, q] of Object.entries(it.receivedSizes)) {
+          const n = intOrNull(q);
+          if (n !== null) receivedSizes[size] = n;
+        }
+        if (!Object.keys(receivedSizes).length) receivedSizes = null;
+      }
+      await tx
+        .update(orderItems)
+        .set({
+          receivedQty: intOrNull(it.receivedQty),
+          defectiveQty: intOrNull(it.defectiveQty),
+          checkNotes: it.checkNotes.trim() || null,
+          receivedSizes,
+        })
+        .where(and(eq(orderItems.id, it.id), eq(orderItems.orderId, orderId)));
+    }
+    for (const t of input.trackings) {
+      if (!trackingIds.has(t.id)) continue;
+      await tx
+        .update(trackings)
+        .set({
+          received: t.received,
+          receivedDate: t.received && /^\d{4}-\d{2}-\d{2}$/.test(t.receivedDate) ? t.receivedDate : null,
+          ...(t.received ? { status: "entregue" as const } : {}),
+        })
+        .where(and(eq(trackings.id, t.id), eq(trackings.orderId, orderId)));
+    }
+
+    if (input.updateStatus && AUTO_STATUS_FROM.includes(order.status)) {
+      const expected = order.items.reduce((s, i) => s + i.totalPieces, 0);
+      const received = input.items.reduce((s, i) => s + (intOrNull(i.receivedQty) ?? 0), 0);
+      if (received > 0) {
+        await tx
+          .update(orders)
+          .set({ status: received >= expected ? "recebido" : "recebido_parcial", updatedAt: new Date() })
+          .where(eq(orders.id, orderId));
+      }
+    }
+  });
+
+  revalidateOrder(orderId);
+  return {};
+}
