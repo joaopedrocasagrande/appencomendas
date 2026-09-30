@@ -754,12 +754,16 @@ function OrderForm({ ctx, id }) {
   })) : [emptyItem()]);
   const [expenses, setExpenses] = useState(() => (existing?.expenses || []).map((e) => ({ ...e, amount: toInput(e.amount) })));
   const [rateTouched, setRateTouched] = useState(!!existing?.rate);
+  // Título: preenchido sozinho com "Fornecedor - Modalidade" até a pessoa digitar outro
+  const [titleTouched, setTitleTouched] = useState(!!existing?.title);
   const cvTotal = useConv(existing?.currency === "USD" && existing?.totalBRL > 0 ? existing.totalBRL : null);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const cur = f.currency;
   const frate = parseDec(f.rate);
+  const autoTitle = [norm(f.supplier), norm(f.mode)].filter(Boolean).join(" - ");
+  const title = titleTouched ? f.title : autoTitle;
 
   if (id && !existing) return html`<${Head} title="Pedido não encontrado" back=${() => go("pedidos")} />`;
 
@@ -792,7 +796,7 @@ function OrderForm({ ctx, id }) {
 
   async function save() {
     setErr(null);
-    if (!norm(f.title)) return setErr("Informe o título do pedido.");
+    if (!norm(title)) return setErr("Informe o título do pedido (ou o fornecedor e a modalidade).");
     if (items.some((i) => !norm(i.product))) return setErr("Informe o produto de todos os itens.");
     if (expenses.some((e) => !norm(e.description))) return setErr("Informe a descrição de todas as despesas.");
     const rate = parseDec(f.rate);
@@ -809,7 +813,7 @@ function OrderForm({ ctx, id }) {
       const body = {
         ...(existing || {}),
         number: existing ? existing.number : Math.max(0, ...D.orders.map((o) => o.number || 0)) + 1,
-        title: norm(f.title), supplierId, orderDate: f.orderDate || null, expectedDate: f.expectedDate || null, modeId, carrierId,
+        title: norm(title), supplierId, orderDate: f.orderDate || null, expectedDate: f.expectedDate || null, modeId, carrierId,
         currency: cur, rate: rate || null, freight: parseDec(f.freight) || 0, discount: parseDec(f.discount) || 0,
         ...(() => { const m = cur === "USD" && cvTotal.manual ? parseDec(cvTotal.val) : null; return m > 0 && tot.supplierTotal > 0 ? { totalBRL: r2(m), totalBRLFor: tot.supplierTotal } : { totalBRL: null, totalBRLFor: null }; })(),
         taxMode: f.taxMode, taxAmount: f.taxMode === "incluso" ? parseDec(f.taxAmount) || 0 : 0, taxForecast: f.taxMode === "por_fora" ? parseDec(f.taxForecast) || 0 : 0, status: f.status, notes: f.notes.trim() || null, needsReview: f.needsReview,
@@ -841,7 +845,7 @@ function OrderForm({ ctx, id }) {
     <datalist id="dl-size">${SIZES.map((v) => html`<option key=${v} value=${v} />`)}</datalist>
     <${Head} title=${existing ? "Editar pedido #" + existing.number : "Novo pedido"} back=${() => (existing ? go("pedido", { id }) : go("pedidos"))} />
     <${Card} title="Dados do pedido"><div class="grid g3">
-      <${Field} label="Título do pedido" className="span-all"><input id="f-title" value=${f.title} onInput=${(e) => set("title", e.target.value)} /><//>
+      <${Field} label="Título do pedido" className="span-all" hint=${titleTouched ? (autoTitle && norm(f.title) !== autoTitle ? html`<button type="button" class="link" onClick=${() => { set("title", ""); setTitleTouched(false); }}>Usar "${autoTitle}"</button>` : null) : "Preenchido com fornecedor + modalidade. Pode editar."}><input id="f-title" value=${title} placeholder="Fornecedor - Modalidade" onInput=${(e) => { set("title", e.target.value); setTitleTouched(e.target.value !== ""); }} /><//>
       <${Field} label="Fornecedor" hint="Digite um nome novo para cadastrar na hora."><input id="f-sup" list="dl-sup" value=${f.supplier} onInput=${(e) => set("supplier", e.target.value)} /><//>
       <${Field} label="Status do pedido"><select id="f-status" value=${f.status} onChange=${(e) => set("status", e.target.value)}>${Object.entries(ORDER_STATUS).map(([k, l]) => html`<option key=${k} value=${k}>${l}</option>`)}</select><//>
       <${Field} label="Data do pedido"><input id="f-date" type="date" value=${f.orderDate} onChange=${(e) => onDate(e.target.value)} /><//>
