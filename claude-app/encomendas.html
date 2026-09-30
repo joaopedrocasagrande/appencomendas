@@ -286,16 +286,16 @@ function receipt(o) {
   else status = "parcial";
   return { status, expected, received, defective, missing: Math.max(expected - received, 0), pk, pt: trk.length };
 }
-// Valor na moeda original; se for dólar, mostra ao lado (pequeno) o valor em reais
+// Valor em dólar: reais em destaque e o dólar pequeno ao lado
 const toBRLv = (v, cur, rate) => (cur === "USD" ? convert(v, "USD", "BRL", rate || FALLBACK_RATE) : v);
 function M(v, cur, rate, block) {
   if (cur !== "USD" || v === null || v === undefined) return money(v, cur);
   const b = toBRLv(v, cur, rate);
-  return html`${money(v, "USD")}<span class=${cx("brl", block && "blk")}>${b === null ? "sem cotação" : money(b)}</span>`;
+  if (b === null) return html`${money(v, "USD")}<span class=${cx("brl", block && "blk")}>sem cotação</span>`;
+  return html`${money(b)}<span class=${cx("brl", block && "blk")}>${money(v, "USD")}</span>`;
 }
 // Dica para campos digitados em dólar: "= R$ X"
 const brlHint = (val, cur, rate) => { if (cur !== "USD") return null; const v = parseDec(val); if (!v) return null; const b = toBRLv(v, "USD", rate); return b === null ? "Defina a cotação para ver em reais" : "= " + money(b); };
-const other = (v, cur, rate) => { if (cur !== "USD") return null; const c = toBRLv(v, cur, rate); return c === null ? "Sem cotação" : "= " + money(c); };
 const isLate = (o) => !!o.expectedDate && o.expectedDate < today() && !CLOSED.includes(o.status);
 function rateFor(rates, day) {
   let best = null;
@@ -862,7 +862,7 @@ function OrderForm({ ctx, id }) {
       <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
         <div><div class="small muted">Peças</div><strong class="tab">${num(tot.pieces, 0)}</strong></div>
         <div><div class="small muted">Produtos</div><strong class="tab">${M(tot.itemsTotal, cur, tot.orate, true)}</strong></div>
-        <div><div class="small muted">Total ao fornecedor</div><strong class="tab" style="color:var(--accent)">${money(tot.supplierTotal, cur)}</strong><div class="small muted">${other(tot.supplierTotal, cur, tot.orate) || ""}</div></div>
+        <div><div class="small muted">Total ao fornecedor</div><strong class="tab" style="color:var(--accent)">${M(tot.supplierTotal, cur, tot.orate, true)}</strong></div>
         <div><div class="small muted">Despesas à parte</div><strong class="tab">${money(tot.extrasBRL)}</strong></div>
         ${tot.taxForecastBRL > 0 ? html`<div><div class="small muted">Imposto previsto</div><strong class="tab">${money(tot.taxForecastBRL)}</strong></div>` : null}
       </div>
@@ -896,9 +896,9 @@ function OrderDetail({ ctx, id }) {
 
     <${Card} title="Financeiro">
       <div class="stats">
-        <${Stat} label="Total ao fornecedor" value=${money(tt.supplierTotal, cur)} sub=${other(tt.supplierTotal, cur, tt.orate)} />
-        <${Stat} label="Já pago" value=${money(tt.paid, cur)} sub=${cur === "USD" ? "= " + money(tt.paidBRL) + " (cotação de cada pagamento)" : null} tone="good" />
-        <${Stat} label="Falta pagar" value=${money(Math.max(tt.pending, 0), cur)} sub=${tt.pending < 0 ? "Pago a mais: " + money(-tt.pending, cur) : other(Math.max(tt.pending, 0), cur, tt.orate)} tone=${tt.pending > 0.01 ? "bad" : "good"} />
+        <${Stat} label="Total ao fornecedor" value=${money(tt.supplierTotalBRL)} sub=${cur === "USD" ? money(tt.supplierTotal, "USD") : null} />
+        <${Stat} label="Já pago" value=${money(cur === "USD" ? tt.paidBRL : tt.paid)} sub=${cur === "USD" ? money(tt.paid, "USD") + " (cotação de cada pagamento)" : null} tone="good" />
+        <${Stat} label="Falta pagar" value=${money(tt.pending > 0 ? tt.pendingBRL : 0)} sub=${tt.pending < 0 ? "Pago a mais: " + money(-tt.pending, cur) : cur === "USD" ? money(Math.max(tt.pending, 0), "USD") : null} tone=${tt.pending > 0.01 ? "bad" : "good"} />
         <${Stat} label="Imposto e despesas à parte" value=${money(tt.extrasBRL)} sub=${tt.extrasPendingBRL > 0 ? "Despesas pendentes: " + money(tt.extrasPendingBRL) : tt.taxAwaiting ? "Imposto por fora ainda não lançado" : "Nada pendente"} tone=${tt.extrasPendingBRL > 0 || tt.taxAwaiting ? "warn" : null} />
         <${Stat} label="Imposto" value=${o.taxMode === "sem" && tt.taxTotalBRL === 0 ? "Sem imposto" : money(tt.taxTotalBRL)} sub=${tt.taxForecastBRL > 0 ? "Previsto " + money(tt.taxForecastBRL) + (tt.taxDone ? " · concluído" : "") : TAX_LABEL[o.taxMode]} tone=${tt.taxForecastPendingBRL > 0 ? "warn" : null} />
         <${Stat} label="Custo total estimado" value=${money(tt.landedBRL)} sub=${tt.taxForecastPendingBRL > 0 ? "Inclui imposto previsto a pagar" : "Pagamentos + saldo + à parte"} />
