@@ -56,8 +56,6 @@ header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; 
 nav.desk { display: none; gap: 2px; }
 nav.desk button { background: none; border: 0; padding: 7px 12px; border-radius: 8px; color: var(--muted); font: 500 .92rem var(--font-body); cursor: pointer; }
 nav.desk button.on { background: var(--accent-soft); color: var(--accent); }
-.rate-chip { margin-left: auto; border: 0; border-radius: 999px; padding: 5px 11px; font: 500 .85rem var(--font-body); cursor: pointer; background: var(--surface-2); color: var(--fg); }
-.rate-chip.stale { background: var(--warn-soft); color: var(--warn); }
 nav.mob { position: fixed; inset: auto 0 0 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
 nav.mob button { background: none; border: 0; padding: 9px 2px 8px; font: 500 .72rem var(--font-body); color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
 nav.mob button.on { color: var(--accent); }
@@ -456,7 +454,7 @@ const ICONS = {
   dolar: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M16.5 7.5c-.8-1.2-2.4-2-4.5-2-2.6 0-4.3 1.3-4.3 3.1 0 4.4 9 2.4 9 6.9 0 1.9-1.9 3.2-4.7 3.2-2.3 0-4-.9-4.8-2.2"/></svg>`,
   cadastros: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>`,
 };
-// "Novo" e "Dólar" continuam existindo, só não aparecem no menu (acesso pelo botão "+ Novo pedido" e pela cotação no topo)
+// "Novo" e "Dólar" continuam existindo, só não aparecem no menu (Novo: botão "+ Novo pedido"; Dólar: fora da navegação por enquanto)
 const NAV = [["painel", "Painel"], ["pedidos", "Pedidos"], ["cadastros", "Cadastros"]];
 
 // ---------------- App ----------------
@@ -497,7 +495,6 @@ function App() {
     <header class="top"><div class="top-in">
       <button class="brand" style="background:none;border:0;cursor:pointer" onClick=${() => go("painel")}><span class="brand-mark"></span>Encomendas</button>
       <nav class="desk">${NAV.map(([k, l]) => html`<button key=${k} class=${active === k ? "on" : ""} onClick=${() => go(k)}>${l}</button>`)}</nav>
-      <button class=${cx("rate-chip", (!cur || cur.id !== t) && "stale")} onClick=${() => go("dolar")} title=${cur ? "Cotação de " + fdate(cur.id) : "Nenhuma cotação"}>$1 = ${cur ? money(cur.usdBrl) : "definir"}${cur && cur.id !== t ? " ⚠" : ""}</button>
     </div></header>
     ${!st.canWrite ? html`<div style="max-width:1100px;margin:10px auto 0;padding:0 16px"><div class="banner b-info">Você está só visualizando. Peça ao dono do app acesso de "Contributor" para cadastrar e editar.</div></div>` : null}
     <main class="page">${page}</main>
@@ -536,11 +533,10 @@ function Painel({ ctx }) {
 
   if (!D.orders.length) {
     return html`<${Head} title="Painel" actions=${html`<button class="btn pri" onClick=${() => go("novo")}>+ Novo pedido</button>`} />
-      <${Card} title="Comece por aqui"><p>Nenhum pedido ainda. Cadastre o primeiro pedido e defina a cotação do dólar de hoje; o painel passa a mostrar o que falta pagar, o que está atrasado e o que chega nos próximos dias.</p>
-      <div class="row"><button class="btn pri" onClick=${() => go("novo")}>Cadastrar primeiro pedido</button><button class="btn" onClick=${() => go("dolar")}>Definir cotação</button></div><//>`;
+      <${Card} title="Comece por aqui"><p>Nenhum pedido ainda. Cadastre o primeiro pedido; o painel passa a mostrar o que falta pagar, o que está atrasado e o que chega nos próximos dias.</p>
+      <div class="row"><button class="btn pri" onClick=${() => go("novo")}>Cadastrar primeiro pedido</button></div><//>`;
   }
   return html`<${Head} title="Painel" actions=${html`<button class="btn pri" onClick=${() => go("novo")}>+ Novo pedido</button>`} />
-    ${!curRate || curRate.id !== t ? html`<button class="banner b-warn" style="border:0;text-align:left;cursor:pointer;font:inherit" onClick=${() => go("dolar")}>A cotação do dólar de hoje ainda não foi definida${curRate ? " (usando a de " + fdate(curRate.id) + ")" : ""}. Toque para definir.</button>` : null}
     <div class="stats">
       <${Stat} label="Pedidos a pagar" value=${money(toBRL(pend))} sub=${pend.USD > 0 ? "Inclui " + money(pend.USD, "USD") + " de pedidos em dólar (= " + money(pend.usdBRL) + ")" : "Saldo com fornecedores"} tone=${toBRL(pend) > 0 ? "bad" : "good"} onClick=${() => toList({ pagamento: "em_aberto" })} />
       <${Stat} label="Impostos previstos a pagar" value=${money(taxFc)} sub=${rows.filter((x) => x.t.taxForecastPendingBRL > 0).length + " pedido(s) com previsão"} tone=${taxFc > 0 ? "warn" : null} onClick=${() => toList({ situacao: "imposto_previsto" })} />
