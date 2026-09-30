@@ -56,7 +56,7 @@ header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; 
 nav.desk { display: none; gap: 2px; }
 nav.desk button { background: none; border: 0; padding: 7px 12px; border-radius: 8px; color: var(--muted); font: 500 .92rem var(--font-body); cursor: pointer; }
 nav.desk button.on { background: var(--accent-soft); color: var(--accent); }
-nav.mob { position: fixed; inset: auto 0 0 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+nav.mob { position: fixed; inset: auto 0 0 0; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
 nav.mob button { background: none; border: 0; padding: 9px 2px 8px; font: 500 .72rem var(--font-body); color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
 nav.mob button.on { color: var(--accent); }
 nav.mob svg { width: 21px; height: 21px; }
@@ -146,6 +146,28 @@ td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .radio.on { border-color: var(--accent); background: var(--accent-soft); }
 .toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 50; background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-weight: 500; font-size: .9rem; }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.span-all { grid-column: 1 / -1; }
+div.f { display: grid; gap: 4px; }
+.money.pct { display: inline-block; width: 130px; }
+.money.pct::before { left: auto; right: 11px; }
+.money.pct input { padding-left: 10px; padding-right: 30px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); max-width: 100%; width: fit-content; overflow-x: auto; }
+.seg button { border: 0; background: none; padding: 6px 12px; white-space: nowrap; font: 500 .85rem var(--font-body); color: var(--fg); cursor: pointer; }
+.seg button.on { background: var(--navy); color: var(--surface); }
+.linkish { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; min-width: 0; }
+.price-li { align-items: center; gap: 12px; }
+.price-v { text-align: right; flex-shrink: 0; margin-left: auto; }
+.price-v .big { font-family: var(--font-display); font-size: 1.25rem; color: var(--accent); }
+.bars { display: grid; gap: 10px; }
+.bar-row.click { cursor: pointer; }
+.bar-top { display: flex; justify-content: space-between; gap: 10px; font-size: .88rem; margin-bottom: 3px; }
+.bar-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-v { white-space: nowrap; font-weight: 600; }
+.bar-t { height: 10px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.bar-f { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.clip { display: inline-flex; align-items: center; gap: 4px; font-size: .8rem; background: var(--surface-2); border-radius: 999px; padding: 3px 10px; color: var(--fg); text-decoration: none; }
+.clip a { color: inherit; text-decoration: none; }
+.clip .x { border: 0; background: none; cursor: pointer; font-size: 1rem; line-height: 1; color: var(--muted); padding: 0 0 0 2px; }
 .sortmenu { position: relative; justify-self: start; }
 .sort-btn { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 7px 14px; font: 500 .88rem var(--font-body); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
 .sort-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; min-width: 240px; max-width: calc(100vw - 32px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 30px rgb(0 0 0 / .16); padding: 4px; display: grid; }
@@ -353,7 +375,7 @@ function trackingLink(code, carrier) {
 }
 
 // ---------------- Dados (capacidade db do Claude) ----------------
-const COLS = { orders: "orders", suppliers: "suppliers", products: "products", modes: "modes", carriers: "carriers", methods: "methods", rates: "rates" };
+const COLS = { orders: "orders", suppliers: "suppliers", products: "products", modes: "modes", carriers: "carriers", methods: "methods", rates: "rates", settings: "settings" };
 const ENT = {
   suppliers: { title: "Fornecedores", one: "fornecedor", fields: [["name", "Nome"], ["contact", "Contato (WeChat, WhatsApp...)"], ["notes", "Observações"]], ref: "supplierId" },
   products: { title: "Produtos", one: "produto", fields: [["name", "Nome"], ["notes", "Observações"]] },
@@ -372,7 +394,7 @@ function queued(path, fn) {
 }
 
 function useStore() {
-  const [st, setSt] = useState({ ready: false, db: null, noDb: false, canWrite: true, isAdmin: false, data: { orders: [], suppliers: [], products: [], modes: [], carriers: [], methods: [], rates: [] }, loaded: {} });
+  const [st, setSt] = useState({ ready: false, db: null, noDb: false, canWrite: true, isAdmin: false, data: { orders: [], suppliers: [], products: [], modes: [], carriers: [], methods: [], rates: [], settings: [] }, loaded: {}, user: null, meId: null, assets: null });
   useEffect(() => {
     let unsubs = [], alive = true;
     (async () => {
@@ -382,7 +404,11 @@ function useStore() {
       let canWrite = true, isAdmin = false;
       try { const w = await user?.can("data.write"); if (w === false) canWrite = false; } catch (e) {}
       try { isAdmin = !!((await user?.canEdit()) || (await user?.isOwner())); } catch (e) {}
-      setSt((s) => ({ ...s, ready: true, db, canWrite, isAdmin }));
+      let meId = null;
+      try { meId = (await user?.me())?.id || null; } catch (e) {}
+      setSt((s) => ({ ...s, ready: true, db, canWrite, isAdmin, user, meId }));
+      // Comprovantes: só quem pode editar recebe o armazenamento de arquivos
+      Promise.resolve(window.claude?.use?.("assets")).then((a) => { if (alive && a) setSt((s) => ({ ...s, assets: a })); }).catch(() => {});
       for (const name of Object.keys(COLS)) {
         const u = db.collection(COLS[name]).onSnapshot(
           (snap) => {
@@ -399,11 +425,78 @@ function useStore() {
   return st;
 }
 
-function makeApi(db) {
+// ---------------- Histórico de alterações ----------------
+const PAY_WORD = { payments: "Pagamento", taxPayments: "Imposto pago" };
+function describeChange(prev, patch) {
+  const out = [];
+  const amt = (x) => (x ? (x.currency === "USD" ? money(x.amount, "USD") : money(x.amount)) : "");
+  if ("status" in patch && patch.status !== prev.status) out.push("Status: " + (ORDER_STATUS[prev.status] || "—") + " → " + ORDER_STATUS[patch.status]);
+  for (const k of ["payments", "taxPayments"]) {
+    if (!(k in patch)) continue;
+    const a = prev[k] || [], b = patch[k] || [];
+    const ids = new Set(a.map((x) => x.id));
+    const added = b.filter((x) => !ids.has(x.id));
+    const removed = a.filter((x) => !b.some((y) => y.id === x.id));
+    const changed = b.filter((x) => { const o = a.find((y) => y.id === x.id); return o && JSON.stringify(o) !== JSON.stringify(x); });
+    added.forEach((x) => out.push(PAY_WORD[k] + " lançado: " + amt(x) + (x.date ? " (" + fdate(x.date) + ")" : "")));
+    removed.forEach((x) => out.push(PAY_WORD[k] + " excluído: " + amt(x)));
+    changed.forEach((x) => { const o = a.find((y) => y.id === x.id); out.push(PAY_WORD[k] + " alterado: " + (amt(o) !== amt(x) ? amt(o) + " → " + amt(x) : amt(x)) + ((x.files || []).length !== (o.files || []).length ? " (comprovantes)" : "")); });
+  }
+  if ("trackings" in patch) {
+    const a = prev.trackings || [], b = patch.trackings || [];
+    const n = b.filter((x) => !a.some((y) => y.id === x.id)).length, r = a.filter((x) => !b.some((y) => y.id === x.id)).length;
+    if (n) out.push(n + " rastreio(s) adicionado(s)");
+    if (r) out.push(r + " rastreio(s) excluído(s)");
+    const st = b.filter((x) => { const o = a.find((y) => y.id === x.id); return o && (o.status !== x.status || o.received !== x.received); });
+    if (st.length) out.push("Rastreio atualizado: " + st.map((x) => x.code + " → " + (x.received ? "recebido" : TRK_STATUS[x.status] || x.status)).join(", "));
+  }
+  if ("items" in patch) out.push("Conferência de recebimento salva");
+  if ("expenses" in patch) out.push("Despesas atualizadas");
+  if ("needsReview" in patch && !patch.needsReview) out.push("Marcado como revisado");
+  if ("taxDone" in patch) out.push(patch.taxDone ? "Imposto marcado como concluído" : "Imposto reaberto");
+  if ("taxForecast" in patch) out.push("Previsão de imposto: " + money(patch.taxForecast || 0));
+  return out.join(" · ") || "Pedido atualizado";
+}
+// Data/hora de mudança de status de cada rastreio (para o alerta de rastreio parado)
+function stampTrackings(prev, list) {
+  const now = new Date().toISOString();
+  return list.map((k) => { const o = (prev || []).find((x) => x.id === k.id); return o && o.status === k.status && o.received === k.received ? { ...k, statusAt: k.statusAt || o.statusAt || null } : { ...k, statusAt: now }; });
+}
+
+function makeApi(db, getData, getMe) {
   const col = (c) => db.collection(c);
+  const lastHist = {}; // histórico mais recente escrito por esta tela (o banco pode ainda não ter devolvido)
+  const hist = (id, prev, what) => {
+    const base = lastHist[id] && lastHist[id].length >= (prev?.history || []).length ? lastHist[id] : prev?.history || [];
+    const h = [...base, { at: new Date().toISOString(), by: getMe() || null, what }].slice(-200);
+    lastHist[id] = h;
+    return h;
+  };
+  const findOrder = (id) => getData().orders.find((o) => o.id === id);
   return {
-    async saveOrder(id, body) { const path = "orders/" + id; return queued(path, () => col("orders").doc(id).set(body)); },
-    async patchOrder(id, patch) { const path = "orders/" + id; return queued(path, () => col("orders").doc(id).update({ ...patch, updatedAt: new Date().toISOString() })); },
+    async saveOrder(id, body) {
+      const path = "orders/" + id;
+      return queued(path, () => {
+        const prev = findOrder(id);
+        let what = prev ? "Pedido editado" : "Pedido criado";
+        if (prev) {
+          const a = totals(prev), b = totals(body);
+          if (Math.abs(a.supplierTotal - b.supplierTotal) > 0.009) what += " · total " + money(a.supplierTotal, a.cur) + " → " + money(b.supplierTotal, b.cur);
+          if (prev.status !== body.status) what += " · status " + (ORDER_STATUS[prev.status] || "—") + " → " + ORDER_STATUS[body.status];
+        }
+        return col("orders").doc(id).set({ ...body, history: hist(id, prev || body, what) });
+      });
+    },
+    async patchOrder(id, patch) {
+      const path = "orders/" + id;
+      return queued(path, () => {
+        const prev = findOrder(id) || {};
+        const p = { ...patch };
+        if (p.trackings) p.trackings = stampTrackings(prev.trackings, p.trackings);
+        p.history = hist(id, prev, describeChange(prev, p));
+        return col("orders").doc(id).update({ ...p, updatedAt: new Date().toISOString() });
+      });
+    },
     async deleteOrder(id) { return queued("orders/" + id, () => col("orders").doc(id).delete()); },
     async saveEntity(c, id, body) { return queued(c + "/" + id, () => col(c).doc(id).set(body)); },
     async deleteEntity(c, id) { return queued(c + "/" + id, () => col(c).doc(id).delete()); },
@@ -452,15 +545,19 @@ const ICONS = {
   pedidos: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>`,
   novo: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>`,
   dolar: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M16.5 7.5c-.8-1.2-2.4-2-4.5-2-2.6 0-4.3 1.3-4.3 3.1 0 4.4 9 2.4 9 6.9 0 1.9-1.9 3.2-4.7 3.2-2.3 0-4-.9-4.8-2.2"/></svg>`,
+  precos: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/></svg>`,
+  analises: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>`,
   cadastros: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>`,
 };
 // "Novo" e "Dólar" continuam existindo, só não aparecem no menu (Novo: botão "+ Novo pedido"; Dólar: fora da navegação por enquanto)
-const NAV = [["painel", "Painel"], ["pedidos", "Pedidos"], ["cadastros", "Cadastros"]];
+const NAV = [["painel", "Painel"], ["pedidos", "Pedidos"], ["precos", "Preços"], ["analises", "Análises"], ["cadastros", "Cadastros"]];
 
 // ---------------- App ----------------
 function App() {
   const st = useStore();
-  const api = useMemo(() => (st.db ? makeApi(st.db) : null), [st.db]);
+  const dataRef = useRef(null), meRef = useRef(null);
+  dataRef.current = st.data; meRef.current = st.meId;
+  const api = useMemo(() => (st.db ? makeApi(st.db, () => dataRef.current, () => meRef.current) : null), [st.db]);
   const [view, setView] = useState({ name: "painel" });
   const [filters, setFilters] = useState({});
   const [toast, setToast] = useState(null);
@@ -484,7 +581,9 @@ function App() {
   let page;
   if (view.name === "painel") page = html`<${Painel} ctx=${ctx} />`;
   else if (view.name === "pedidos") page = html`<${Pedidos} ctx=${ctx} />`;
-  else if (view.name === "novo") page = html`<${OrderForm} key="novo" ctx=${ctx} />`;
+  else if (view.name === "novo") page = html`<${OrderForm} key=${"novo" + (view.from || "")} ctx=${ctx} from=${view.from} />`;
+  else if (view.name === "precos") page = html`<${Precos} ctx=${ctx} />`;
+  else if (view.name === "analises") page = html`<${Analises} ctx=${ctx} />`;
   else if (view.name === "editar") page = html`<${OrderForm} key=${"e" + view.id} ctx=${ctx} id=${view.id} />`;
   else if (view.name === "pedido") page = html`<${OrderDetail} ctx=${ctx} id=${view.id} />`;
   else if (view.name === "conferencia") page = html`<${Conference} ctx=${ctx} id=${view.id} />`;
@@ -523,7 +622,7 @@ function Painel({ ctx }) {
   const late = open.filter((x) => isLate(x.o));
   const soon = addDays(t, 15);
   const arriving = open.filter((x) => x.o.expectedDate && x.o.expectedDate >= t && x.o.expectedDate <= soon).sort((a, b) => (a.o.expectedDate < b.o.expectedDate ? -1 : 1));
-  const attention = rows.filter((x) => x.o.needsReview || x.t.taxAwaiting || x.r.status === "divergencia");
+  const attention = rows.map((x) => ({ ...x, al: alertsFor(x.o, x.t, x.r, t) })).filter((x) => x.al.length);
   const toList = (f) => { setFilters(f); go("pedidos"); };
   const OList = ({ list, empty, right }) => list.length ? html`<div class="list">${list.slice(0, 12).map((x) => html`
       <div class="li" key=${x.o.id} style="cursor:pointer" onClick=${() => go("pedido", { id: x.o.id })}>
@@ -551,7 +650,7 @@ function Painel({ ctx }) {
       <${Card} title=${"Chegando em 15 dias (" + arriving.length + ")"}><${OList} list=${arriving} empty="Nenhuma chegada prevista nos próximos 15 dias." right=${(x) => fdate(x.o.expectedDate)} /><//>
       <${Card} title="A pagar por fornecedor">${Object.values(bySup).length ? html`<div class="list">${Object.values(bySup).sort((a, b) => toBRL(b) - toBRL(a)).map((s) => html`
         <div class="li" key=${s.name} style="cursor:pointer" onClick=${() => toList({ fornecedor: s.id || "", pagamento: "em_aberto" })}><strong>${s.name}</strong><span class="tab" style="text-align:right"><div>${money(s.total)}</div>${s.USD > 0 ? html`<div class="small muted">inclui ${money(s.USD, "USD")}</div>` : null}</span></div>`)}</div>` : html`<div class="empty">Nenhum saldo a pagar.</div>`}<//>
-      <${Card} title=${"Precisam de atenção (" + attention.length + ")"}><${OList} list=${attention} empty="Nada pendente de revisão." right=${(x) => html`<span class="row" style="justify-content:flex-end">${x.o.needsReview ? html`<${Pill} tone="p-warn">Revisar<//>` : null}${x.t.taxAwaiting ? html`<${Pill} tone="p-acc">Imposto a lançar<//>` : null}${x.r.status === "divergencia" ? html`<${Pill} tone="p-bad">Divergência<//>` : null}</span>`} /><//>
+      <${Card} title=${"Precisam de atenção (" + attention.length + ")"}><${OList} list=${attention} empty="Nada pendente." right=${(x) => html`<span class="row" style="justify-content:flex-end">${x.al.map(([tone, l]) => html`<${Pill} key=${l} tone=${tone}>${l}<//>`)}</span>`} /><//>
     </div>`;
 }
 
@@ -713,7 +812,7 @@ function ExportButton({ ctx, list }) {
       for (const { o, t, r } of list) {
         const sup = byId.suppliers[o.supplierId]?.name || "";
         P.push({ "Nº": o.number, "Título": o.title, "Fornecedor": sup, "Data do pedido": fdate(o.orderDate), "Previsão": fdate(o.expectedDate), "Modalidade": byId.modes[o.modeId]?.name || "", "Transportadora": byId.carriers[o.carrierId]?.name || "", "Status": ORDER_STATUS[o.status], "Moeda": cur(o.currency), "Cotação": o.rate || "", "Peças": t.pieces, "Produtos": t.itemsTotal, "Frete": t.freight, "Desconto": t.discount, "Despesas do fornecedor": t.supplierExpenses, "Total ao fornecedor": t.supplierTotal, "Total ao fornecedor (R$)": t.supplierTotalBRL, "Pago": t.paid, "Pago (R$)": t.paidBRL, "Falta pagar": t.pending, "Falta pagar (R$)": t.pending > 0 ? t.pendingBRL : 0, "Pagamento": PAY_LABEL[t.payStatus], "Imposto": TAX_LABEL[o.taxMode], "Imposto (R$)": t.taxTotalBRL, "Imposto previsto (R$)": t.taxForecastBRL || "", "Imposto previsto a pagar (R$)": t.taxForecastPendingBRL || "", "Imposto concluído": o.taxMode === "por_fora" ? (o.taxDone ? "Sim" : "Não") : "", "Imposto/despesas à parte (R$)": t.extrasBRL, "Custo total (R$)": t.landedBRL, "Custo por peça (R$)": t.costPerPiece ? r2(t.costPerPiece) : "", "Recebimento": REC_LABEL[r.status], "Peças recebidas": r.received, "Com defeito": r.defective, "Rastreios": (o.trackings || []).length, "Observações": o.notes || "" });
-        for (const i of o.items || []) I.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Produto": byId.products[i.productId]?.name || "", "Variação": i.variant || "", "Caixas": i.boxes ?? "", "Peças/caixa": i.ppb ?? "", "Grades": i.grids ?? "", "Peças/grade": i.ppg ?? "", "Total de peças": i.pieces, "Valor unitário": i.unitPrice, "Moeda": cur(o.currency), "Total": r2(n0(i.pieces) * n0(i.unitPrice)), "Total (R$)": r2(convert(n0(i.pieces) * n0(i.unitPrice), o.currency || "BRL", "BRL", t.orate) || 0), "Tamanhos": i.sizes ? Object.entries(i.sizes).map(([s, q]) => s + ": " + q).join(", ") : "", "Recebido": i.receivedQty ?? "", "Com defeito": i.defectiveQty ?? "", "Obs. conferência": i.checkNotes || "" });
+        for (const i of o.items || []) I.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Produto": byId.products[i.productId]?.name || "", "Variação": i.variant || "", "Caixas": i.boxes ?? "", "Peças/caixa": i.ppb ?? "", "Grades": i.grids ?? "", "Peças/grade": i.ppg ?? "", "Total de peças": i.pieces, "Valor unitário": i.unitPrice, "Moeda": cur(o.currency), "Total": r2(n0(i.pieces) * n0(i.unitPrice)), "Total (R$)": r2(convert(n0(i.pieces) * n0(i.unitPrice), o.currency || "BRL", "BRL", t.orate) || 0), "Custo real/peça (R$)": (() => { const c = itemCosts(o, t).find((x) => x.i.id === i.id); return c && c.cost !== null ? r2(c.cost) : ""; })(), "Tamanhos": i.sizes ? Object.entries(i.sizes).map(([s, q]) => s + ": " + q).join(", ") : "", "Recebido": i.receivedQty ?? "", "Com defeito": i.defectiveQty ?? "", "Obs. conferência": i.checkNotes || "" });
         for (const p of o.payments || []) PG.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Data": fdate(p.date), "Valor": p.amount, "Moeda": cur(p.currency), "Cotação": p.rate ? Math.round(p.rate * 10000) / 10000 : "", "Valor em R$": p.currency === "BRL" ? p.amount : p.brlAmount ?? r2(convert(p.amount, p.currency, "BRL", p.rate || t.orate) || 0), "Forma de pagamento": byId.methods[p.methodId]?.name || "", "Observação": p.notes || "" });
         for (const x of o.taxPayments || []) IM.push({ "Nº pedido": o.number, "Pedido": o.title, "Data": fdate(x.date), "Valor": x.amount, "Moeda": cur(x.currency), "Cotação": x.rate ? Math.round(x.rate * 10000) / 10000 : "", "Valor em R$": x.currency === "BRL" ? x.amount : x.brlAmount ?? r2(convert(x.amount, x.currency, "BRL", x.rate || t.orate) || 0), "Pacote": (o.trackings || []).find((k) => k.id === x.trackingId)?.code || "Pedido todo", "Observação": x.notes || "" });
         for (const k of o.trackings || []) R.push({ "Nº pedido": o.number, "Pedido": o.title, "Código": k.code, "Conteúdo": k.label || "", "Transportadora": byId.carriers[k.carrierId]?.name || "", "Status": TRK_STATUS[k.status], "Recebido": k.received ? "Sim" : "Não", "Data recebimento": fdate(k.receivedDate), "Observação": k.notes || "" });
@@ -736,17 +835,24 @@ function suggested(i) {
   if (g && pg) return Math.round(g * pg);
   return null;
 }
-function OrderForm({ ctx, id }) {
+function OrderForm({ ctx, id, from }) {
   const { D, byId, api, go, notify, today: t } = ctx;
   const existing = id ? D.orders.find((o) => o.id === id) : null;
-  const [f, setF] = useState(() => existing ? {
+  // Duplicar: novo pedido com fornecedor, transporte, moeda, imposto e itens de um pedido anterior
+  const src = !existing && from ? D.orders.find((o) => o.id === from) : null;
+  const [f, setF] = useState(() => src ? {
+    title: "", supplier: byId.suppliers[src.supplierId]?.name || "", orderDate: t,
+    expectedDate: byId.modes[src.modeId]?.defaultDays ? addDays(t, byId.modes[src.modeId].defaultDays) : "",
+    mode: byId.modes[src.modeId]?.name || "", carrier: byId.carriers[src.carrierId]?.name || "", currency: src.currency || "BRL", rate: toInput(rateFor(D.rates, t)?.usdBrl ?? src.rate),
+    freight: "", discount: "", taxMode: src.taxMode || "sem", taxAmount: "", taxForecast: "", status: "confirmado", notes: "", needsReview: false,
+  } : existing ? {
     title: existing.title || "", supplier: byId.suppliers[existing.supplierId]?.name || "", orderDate: existing.orderDate || "", expectedDate: existing.expectedDate || "",
     mode: byId.modes[existing.modeId]?.name || "", carrier: byId.carriers[existing.carrierId]?.name || "", currency: existing.currency || "BRL", rate: toInput(existing.rate),
     freight: toInput(existing.freight), discount: toInput(existing.discount), taxMode: existing.taxMode || "sem", taxAmount: existing.taxMode === "incluso" && existing.taxAmount ? toInput(existing.taxAmount) : "", taxForecast: existing.taxForecast ? toInput(existing.taxForecast) : "",
     status: existing.status || "confirmado", notes: existing.notes || "", needsReview: !!existing.needsReview,
   } : { title: "", supplier: "", orderDate: t, expectedDate: "", mode: "", carrier: "", currency: "BRL", rate: toInput(rateFor(D.rates, t)?.usdBrl), freight: "", discount: "", taxMode: "sem", taxAmount: "", taxForecast: "", status: "confirmado", notes: "", needsReview: false });
-  const [items, setItems] = useState(() => existing && existing.items?.length ? existing.items.map((i) => ({
-    ...i, product: byId.products[i.productId]?.name || "", boxes: toInput(i.boxes), ppb: toInput(i.ppb), grids: toInput(i.grids), ppg: toInput(i.ppg), pieces: String(i.pieces ?? ""), unitPrice: toInput(i.unitPrice),
+  const [items, setItems] = useState(() => (existing || src) && (existing || src).items?.length ? (existing || src).items.map((i) => ({
+    ...i, ...(src ? { id: uid(), receivedQty: null, defectiveQty: null, checkNotes: null, receivedSizes: null } : {}), product: byId.products[i.productId]?.name || "", boxes: toInput(i.boxes), ppb: toInput(i.ppb), grids: toInput(i.grids), ppg: toInput(i.ppg), pieces: String(i.pieces ?? ""), unitPrice: toInput(i.unitPrice),
     sizes: i.sizes ? Object.entries(i.sizes).map(([size, q]) => ({ size, qty: String(q) })) : null, auto: false,
   })) : [emptyItem()]);
   const [expenses, setExpenses] = useState(() => (existing?.expenses || []).map((e) => ({ ...e, amount: toInput(e.amount) })));
@@ -840,7 +946,7 @@ function OrderForm({ ctx, id }) {
     <datalist id="dl-car">${D.carriers.map((s) => html`<option key=${s.id} value=${s.name} />`)}</datalist>
     <datalist id="dl-var">${VARIANTS.map((v) => html`<option key=${v} value=${v} />`)}</datalist>
     <datalist id="dl-size">${SIZES.map((v) => html`<option key=${v} value=${v} />`)}</datalist>
-    <${Head} title=${existing ? "Editar pedido #" + existing.number : "Novo pedido"} back=${() => (existing ? go("pedido", { id }) : go("pedidos"))} />
+    <${Head} title=${existing ? "Editar pedido #" + existing.number : src ? "Novo pedido (cópia do #" + src.number + ")" : "Novo pedido"} back=${() => (existing ? go("pedido", { id }) : go("pedidos"))} />
     <${Card} title="Dados do pedido"><div class="grid g3">
       <${Field} label="Título do pedido" className="span-all" hint=${titleTouched ? (autoTitle && norm(f.title) !== autoTitle ? html`<button type="button" class="link" onClick=${() => { set("title", ""); setTitleTouched(false); }}>Usar "${autoTitle}"</button>` : null) : "Preenchido com fornecedor + modalidade. Pode editar."}><input id="f-title" value=${title} placeholder="Fornecedor - Modalidade" onInput=${(e) => { set("title", e.target.value); setTitleTouched(e.target.value !== ""); }} /><//>
       <${Field} label="Fornecedor" hint="Digite um nome novo para cadastrar na hora."><input id="f-sup" list="dl-sup" value=${f.supplier} onInput=${(e) => set("supplier", e.target.value)} /><//>
@@ -929,12 +1035,12 @@ function OrderDetail({ ctx, id }) {
   const { D, byId, api, go, notify, isAdmin, canWrite, today: t, curRate } = ctx;
   const o = D.orders.find((x) => x.id === id);
   if (!o) return html`<${Head} title="Pedido não encontrado" back=${() => go("pedidos")} /><div class="card"><div class="empty">${ctx.st.loaded.orders ? "Esse pedido foi excluído ou não existe." : "Carregando…"}</div></div>`;
-  const tt = totals(o), r = receipt(o), cur = tt.cur, late = isLate(o);
-  const patch = async (p, msg) => { try { await api.patchOrder(o.id, p); if (msg) notify(msg); } catch (e) { console.error(e); notify("Não foi possível salvar. Tente de novo."); } };
+  const tt = totals(o), r = receipt(o), cur = tt.cur, late = isLate(o), costs = itemCosts(o, tt), cst = costStatus(tt);
+  const patch = async (p, msg) => { try { await api.patchOrder(o.id, p); if (msg) notify(msg); return true; } catch (e) { console.error(e); notify("Não foi possível salvar. Tente de novo."); return false; } };
   const Info = ({ l, v, bad }) => html`<div><div class="small muted">${l}</div><div style=${bad ? "color:var(--bad);font-weight:600" : "font-weight:500"}>${v || "—"}</div></div>`;
 
   return html`
-    <${Head} title=${html`<span class="num">#${o.number}</span> ${o.title}`} back=${() => go("pedidos")} actions=${html`${canWrite ? html`<button class="btn pri" onClick=${() => go("editar", { id: o.id })}>Editar pedido</button>` : null}${isAdmin ? html`<${Confirm} question="Excluir o pedido com tudo?" onConfirm=${async () => { await api.deleteOrder(o.id); notify("Pedido excluído."); go("pedidos"); }} />` : null}`} />
+    <${Head} title=${html`<span class="num">#${o.number}</span> ${o.title}`} back=${() => go("pedidos")} actions=${html`${canWrite ? html`<button class="btn pri" onClick=${() => go("editar", { id: o.id })}>Editar pedido</button><button class="btn" id="dup" onClick=${() => go("novo", { from: o.id })}>Duplicar</button>` : null}${isAdmin ? html`<${Confirm} question="Excluir o pedido com tudo?" onConfirm=${async () => { await api.deleteOrder(o.id); notify("Pedido excluído."); go("pedidos"); }} />` : null}`} />
     <div class="row"><${Pill} tone=${ORDER_TONE[o.status]}>${ORDER_STATUS[o.status]}<//><${Pill} tone=${PAY_TONE[tt.payStatus]}>${PAY_LABEL[tt.payStatus]}<//><${Pill} tone=${REC_TONE[r.status]}>${REC_LABEL[r.status]}<//>${late ? html`<${Pill} tone="p-bad">Atrasado<//>` : null}${o.needsReview ? html`<${Pill} tone="p-warn">Precisa de revisão<//>` : null}</div>
     ${o.needsReview ? html`<div class="banner b-warn row between"><span>Este pedido foi marcado para revisão. Confira os dados.</span>${canWrite ? html`<button class="btn sm" onClick=${() => patch({ needsReview: false }, "Marcado como revisado.")}>Marcar como revisado</button>` : null}</div>` : null}
     ${tt.missingRate ? html`<div class="banner b-warn">Há valores em outra moeda sem cotação. Edite o pedido e informe a cotação.</div>` : null}
@@ -970,14 +1076,15 @@ function OrderDetail({ ctx, id }) {
     <${Taxes} ctx=${ctx} o=${o} tt=${tt} patch=${patch} />
 
     <${Card} title=${"Itens (" + (o.items || []).length + ")"}>
-      <div class="tablewrap"><table><thead><tr><th>Produto</th><th class="r">Caixas</th><th class="r">Grades</th><th class="r">Peças</th><th class="r">Receb.</th><th class="r">Unit.</th><th class="r">Total</th></tr></thead><tbody>
-      ${(o.items || []).map((i) => html`<tr key=${i.id}><td><strong>${byId.products[i.productId]?.name || "—"}</strong><div class="small muted">${[i.variant, i.ppb ? num(i.ppb) + "/caixa" : null, i.grids && i.ppg ? num(i.ppg) + "/grade" : null].filter(Boolean).join(" · ")}</div>
+      <div class="tablewrap"><table><thead><tr><th>Produto</th><th class="r">Caixas</th><th class="r">Grades</th><th class="r">Peças</th><th class="r">Receb.</th><th class="r">Unit.</th><th class="r">Total</th><th class="r">Custo real/peça</th></tr></thead><tbody>
+      ${(o.items || []).map((i, ix) => html`<tr key=${i.id}><td><strong>${byId.products[i.productId]?.name || "—"}</strong><div class="small muted">${[i.variant, i.ppb ? num(i.ppb) + "/caixa" : null, i.grids && i.ppg ? num(i.ppg) + "/grade" : null].filter(Boolean).join(" · ")}</div>
         ${i.sizes ? html`<div class="row" style="margin-top:4px">${Object.entries(i.sizes).map(([s, q]) => html`<${Pill} key=${s}>${s}: ${q}<//>`)}</div>` : null}</td>
         <td class="r">${i.boxes ? num(i.boxes) : "—"}</td><td class="r">${i.grids ? num(i.grids) : "—"}</td><td class="r"><strong>${num(i.pieces, 0)}</strong></td>
         <td class="r" style=${i.receivedQty == null ? "color:var(--muted)" : i.receivedQty === i.pieces && !i.defectiveQty ? "color:var(--good)" : "color:var(--warn)"}>${i.receivedQty == null ? "—" : num(i.receivedQty, 0)}${i.defectiveQty ? html`<div class="small" style="color:var(--bad)">${i.defectiveQty} def.</div>` : null}</td>
-        <td class="r">${M(i.unitPrice, cur, tt.orate, true)}</td><td class="r"><strong>${M(n0(i.pieces) * n0(i.unitPrice), cur, tt.orate, true)}</strong></td></tr>`)}
-      <tr><td><strong>Total</strong></td><td></td><td></td><td class="r"><strong>${num(tt.pieces, 0)}</strong></td><td class="r">${r.received ? num(r.received, 0) : "—"}</td><td></td><td class="r"><strong>${M(tt.itemsTotal, cur, tt.orate, true)}</strong></td></tr>
+        <td class="r">${M(i.unitPrice, cur, tt.orate, true)}</td><td class="r"><strong>${M(n0(i.pieces) * n0(i.unitPrice), cur, tt.orate, true)}</strong></td><td class="r"><strong style="color:var(--accent)">${costs[ix].cost === null ? "—" : money(costs[ix].cost)}</strong></td></tr>`)}
+      <tr><td><strong>Total</strong></td><td></td><td></td><td class="r"><strong>${num(tt.pieces, 0)}</strong></td><td class="r">${r.received ? num(r.received, 0) : "—"}</td><td></td><td class="r"><strong>${M(tt.itemsTotal, cur, tt.orate, true)}</strong></td><td></td></tr>
       </tbody></table></div>
+      <div class="small muted">Custo real por peça: já com frete, imposto e despesas${cst.final ? "" : " — estimado (" + cst.why.join(", ") + ")"}. <button class="link" onClick=${() => go("precos")}>Ver em Preços</button></div>
     <//>
 
     <${Card} title="Recebimento" actions=${canWrite ? html`<button class="btn pri" onClick=${() => go("conferencia", { id: o.id })}>Conferir recebimento</button>` : null}>
@@ -990,7 +1097,8 @@ function OrderDetail({ ctx, id }) {
       ${(o.items || []).filter((i) => i.checkNotes).map((i) => html`<div class="banner b-warn" key=${i.id}><strong>${byId.products[i.productId]?.name}:</strong> ${i.checkNotes}</div>`)}
     <//>
 
-    <${Trackings} ctx=${ctx} o=${o} patch=${patch} />`;
+    <${Trackings} ctx=${ctx} o=${o} patch=${patch} />
+    <${History} ctx=${ctx} o=${o} />`;
 }
 
 function Payments({ ctx, o, tt, patch }) {
@@ -1006,12 +1114,14 @@ function Payments({ ctx, o, tt, patch }) {
   const [editId, setEditId] = useState(null);
   const formRef = useRef(null);
   const cv = useConv();
+  const [kept, setKept] = useState([]), [picked, setPicked] = useState([]);
   // Pagamento em dólar: mostra o valor em reais. Pagamento em reais num pedido em dólar: mostra quanto equivale em dólar.
   const convTarget = currency === "USD" ? "BRL" : o.currency === "USD" ? "USD" : null;
   function reset() {
-    setEditId(null); setDate(t); setAmount(""); setCurrency(o.currency); setRate(toInput(rateFor(D.rates, t)?.usdBrl ?? o.rate)); setMethod(""); setNotes(""); setErr(null); cv.clear();
+    setEditId(null); setDate(t); setAmount(""); setCurrency(o.currency); setRate(toInput(rateFor(D.rates, t)?.usdBrl ?? o.rate)); setMethod(""); setNotes(""); setErr(null); cv.clear(); setKept([]); setPicked([]);
   }
   function startEdit(p) {
+    setKept(p.files || []); setPicked([]);
     setEditId(p.id); setDate(p.date || ""); setAmount(toInput(p.amount)); setCurrency(p.currency || o.currency);
     setRate(toInput(p.rate ?? rateFor(D.rates, p.date || t)?.usdBrl ?? o.rate)); setMethod(byId.methods[p.methodId]?.name || ""); setNotes(p.notes || ""); setErr(null);
     const tg = (p.currency || o.currency) === "USD" ? "BRL" : o.currency === "USD" ? "USD" : null;
@@ -1028,14 +1138,18 @@ function Payments({ ctx, o, tt, patch }) {
     setBusy(true);
     try {
       const methodId = await resolveName(api, D.methods, "methods", method);
-      const pay = { id: editId || uid(), date, amount: a, currency, rate: conv ? conv.rate : r || null, brlAmount: conv ? r2(conv.brlAmount) : null, usdAmount: conv ? r2(conv.usdAmount) : null, methodId, notes: notes.trim() || null };
+      let up = [];
+      if (picked.length && ctx.st.assets) { try { up = await uploadAll(ctx.st.assets, picked); } catch (x) { console.error(x); setBusy(false); return setErr(uploadErr(x)); } }
+      const orig = editId ? (o.payments || []).find((x) => x.id === editId)?.files || [] : [];
+      const pay = { id: editId || uid(), date, amount: a, currency, rate: conv ? conv.rate : r || null, brlAmount: conv ? r2(conv.brlAmount) : null, usdAmount: conv ? r2(conv.usdAmount) : null, methodId, notes: notes.trim() || null, files: [...kept, ...up] };
       if (editId) {
         if (!(o.payments || []).some((x) => x.id === editId)) { reset(); return setErr("Este pagamento foi excluído por outra pessoa."); }
         await api.patchOrder(o.id, { payments: o.payments.map((x) => (x.id === editId ? { ...x, ...pay } : x)) });
+        removeAssets(ctx, orig.filter((f) => !kept.some((k) => k.id === f.id)));
         reset(); notify("Pagamento alterado.");
       } else {
         await api.patchOrder(o.id, { payments: [...(o.payments || []), pay] });
-        setAmount(""); setNotes(""); cv.clear(); notify("Pagamento lançado.");
+        setAmount(""); setNotes(""); cv.clear(); setKept([]); setPicked([]); notify("Pagamento lançado.");
       }
     } catch (e) { console.error(e); setErr(editId ? "Não foi possível salvar a alteração. Tente de novo." : "Não foi possível lançar. Tente de novo."); }
     setBusy(false);
@@ -1046,8 +1160,8 @@ function Payments({ ctx, o, tt, patch }) {
       const inOrder = p.currency === o.currency ? p.amount : o.currency === "USD" && p.usdAmount != null ? p.usdAmount : o.currency === "BRL" && p.brlAmount != null ? p.brlAmount : convert(p.amount, p.currency, o.currency, p.rate || tt.orate);
       const inBRL = p.currency === "USD" ? (p.brlAmount ?? convert(p.amount, "USD", "BRL", p.rate || tt.orate)) : p.amount;
       return html`<div class="li" key=${p.id} style=${editId === p.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(p.date)} · ${p.currency === "USD" ? html`${inBRL === null ? money(p.amount, "USD") : money(inBRL)}<span class="brl">${money(p.amount, "USD")}</span>` : money(p.amount)}</strong>${p.currency === "BRL" && o.currency === "USD" && inOrder !== null ? html`<span class="brl">${money(inOrder, "USD")}</span>` : null}
-        <div class="small muted">${[byId.methods[p.methodId]?.name, p.rate ? "cotação " + money(p.rate) : null, p.notes].filter(Boolean).join(" · ")}</div></div>
-        <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(p)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === p.id) reset(); patch({ payments: o.payments.filter((x) => x.id !== p.id) }, "Pagamento excluído."); }} />` : null}</span></div>`;
+        <div class="small muted">${[byId.methods[p.methodId]?.name, p.rate ? "cotação " + money(p.rate) : null, p.notes].filter(Boolean).join(" · ")}</div><${FileLinks} files=${p.files} /></div>
+        <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(p)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === p.id) reset(); patch({ payments: o.payments.filter((x) => x.id !== p.id) }, "Pagamento excluído.").then((ok) => ok && removeAssets(ctx, p.files)); }} />` : null}</span></div>`;
     })}</div>`}
     ${canWrite ? html`<div ref=${formRef} style=${"background:var(--surface-2);border-radius:8px;padding:12px;display:grid;gap:10px" + (editId ? ";outline:2px solid var(--accent)" : "")}>
       <strong>${editId ? "Editar pagamento" : "Lançar pagamento"}</strong>
@@ -1060,6 +1174,7 @@ function Payments({ ctx, o, tt, patch }) {
         ${convTarget ? convField(cv, amount, currency, convTarget, rate, "pay-conv") : null}
         <${Field} label="Forma de pagamento"><input list="dl-met" value=${method} onInput=${(e) => setMethod(e.target.value)} /><//>
         <${Field} label="Observação"><input value=${notes} onInput=${(e) => setNotes(e.target.value)} /><//>
+        <${AttachPicker} ctx=${ctx} kept=${kept} setKept=${setKept} picked=${picked} setPicked=${setPicked} />
       </div>
       ${err ? html`<div class="err">${err}</div>` : null}
       <div class="row"><button class="btn pri" id="pay-save" disabled=${busy} onClick=${add}>${busy ? "Salvando…" : editId ? "Salvar alteração" : "Lançar pagamento"}</button>${editId ? html`<button class="btn" onClick=${reset}>Cancelar</button>` : null}</div></div>` : null}
@@ -1089,13 +1204,15 @@ function Taxes({ ctx, o, tt, patch }) {
   const [editId, setEditId] = useState(null);
   const formRef = useRef(null);
   const cv = useConv();
+  const [kept, setKept] = useState([]), [picked, setPicked] = useState([]);
   function reset() {
-    setEditId(null); setDate(t); setAmount(""); setCurrency("BRL"); setRate(toInput(rateFor(D.rates, t)?.usdBrl)); setTrk(""); setNotes(""); setErr(null); cv.clear();
+    setEditId(null); setDate(t); setAmount(""); setCurrency("BRL"); setRate(toInput(rateFor(D.rates, t)?.usdBrl)); setTrk(""); setNotes(""); setErr(null); cv.clear(); setKept([]); setPicked([]);
   }
   function startEdit(x) {
     setEditId(x.id); setDate(x.date || ""); setAmount(toInput(x.amount)); setCurrency(x.currency || "BRL");
     setRate(toInput(x.rate ?? rateFor(D.rates, x.date || t)?.usdBrl)); setTrk(x.trackingId || ""); setNotes(x.notes || ""); setErr(null); setOpen(true);
     if ((x.currency || "BRL") === "USD") convLoad(cv, x, "BRL"); else cv.clear();
+    setKept(x.files || []); setPicked([]);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
   }
   async function add() {
@@ -1106,14 +1223,18 @@ function Taxes({ ctx, o, tt, patch }) {
     if (currency === "USD" && !conv) return setErr("Informe a cotação ou o valor em reais.");
     setBusy(true);
     try {
-      const tax = { id: editId || uid(), date, amount: a, currency, rate: conv ? conv.rate : null, brlAmount: conv ? r2(conv.brlAmount) : null, trackingId: trk || null, notes: notes.trim() || null };
+      let up = [];
+      if (picked.length && ctx.st.assets) { try { up = await uploadAll(ctx.st.assets, picked); } catch (x) { console.error(x); setBusy(false); return setErr(uploadErr(x)); } }
+      const orig = editId ? (o.taxPayments || []).find((x) => x.id === editId)?.files || [] : [];
+      const tax = { id: editId || uid(), date, amount: a, currency, rate: conv ? conv.rate : null, brlAmount: conv ? r2(conv.brlAmount) : null, trackingId: trk || null, notes: notes.trim() || null, files: [...kept, ...up] };
       if (editId) {
         if (!(o.taxPayments || []).some((x) => x.id === editId)) { reset(); setBusy(false); return setErr("Este lançamento foi excluído por outra pessoa."); }
         await api.patchOrder(o.id, { taxPayments: o.taxPayments.map((x) => (x.id === editId ? { ...x, ...tax } : x)) });
+        removeAssets(ctx, orig.filter((f) => !kept.some((k) => k.id === f.id)));
         reset(); notify("Lançamento de imposto alterado.");
       } else {
         await api.patchOrder(o.id, { taxMode: o.taxMode === "sem" ? "por_fora" : o.taxMode, taxPayments: [...(o.taxPayments || []), tax] });
-        setAmount(""); setNotes(""); cv.clear(); notify("Imposto lançado.");
+        setAmount(""); setNotes(""); cv.clear(); setKept([]); setPicked([]); notify("Imposto lançado.");
       }
     } catch (e) { console.error(e); setErr(editId ? "Não foi possível salvar a alteração. Tente de novo." : "Não foi possível lançar. Tente de novo."); }
     setBusy(false);
@@ -1135,8 +1256,8 @@ function Taxes({ ctx, o, tt, patch }) {
     ${tt.taxAwaiting ? html`<div class="banner b-warn">Imposto por fora ainda não lançado. Quando pagar, lance abaixo.</div>` : null}
     ${o.taxMode !== "incluso" ? html`
       ${list.length ? html`<div class="list">${list.map((x) => html`<div class="li" key=${x.id} style=${editId === x.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(x.date)} · ${x.currency === "USD" && x.brlAmount != null ? html`${money(x.brlAmount)}<span class="brl">${money(x.amount, "USD")}</span>` : M(x.amount, x.currency, x.rate || tt.orate)}</strong>
-        <div class="small muted">${[(o.trackings || []).find((k) => k.id === x.trackingId) ? "Pacote " + o.trackings.find((k) => k.id === x.trackingId).code : "Pedido todo", x.rate ? "cotação " + money(x.rate) : null, x.notes].filter(Boolean).join(" · ")}</div></div>
-        <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(x)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === x.id) reset(); patch({ taxPayments: list.filter((y) => y.id !== x.id) }, "Lançamento excluído."); }} />` : null}</span></div>`)}
+        <div class="small muted">${[(o.trackings || []).find((k) => k.id === x.trackingId) ? "Pacote " + o.trackings.find((k) => k.id === x.trackingId).code : "Pedido todo", x.rate ? "cotação " + money(x.rate) : null, x.notes].filter(Boolean).join(" · ")}</div><${FileLinks} files=${x.files} /></div>
+        <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(x)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === x.id) reset(); patch({ taxPayments: list.filter((y) => y.id !== x.id) }, "Lançamento excluído.").then((ok) => ok && removeAssets(ctx, x.files)); }} />` : null}</span></div>`)}
         <div class="li"><strong>Total de imposto pago</strong><strong class="tab">${money(tt.taxPaidBRL)}</strong></div></div>` : null}
       ${canWrite ? html`<details ref=${formRef} open=${open} onToggle=${(e) => setOpen(e.target.open)} style=${"background:var(--surface-2);border-radius:8px;padding:12px" + (editId ? ";outline:2px solid var(--accent)" : "")}><summary>${editId ? "Editar imposto pago" : "Lançar imposto pago"}</summary>
         <div class="grid g2" style="margin-top:10px">
@@ -1147,6 +1268,7 @@ function Taxes({ ctx, o, tt, patch }) {
           ${convField(cv, amount, "USD", "BRL", rate, "tax-conv")}` : null}
           <${Field} label="Referente a"><select value=${trk} onChange=${(e) => setTrk(e.target.value)}><option value="">Pedido todo</option>${(o.trackings || []).map((k) => html`<option key=${k.id} value=${k.id}>Pacote ${k.code}${k.label ? " (" + k.label + ")" : ""}</option>`)}</select><//>
           <${Field} label="Observação"><input value=${notes} onInput=${(e) => setNotes(e.target.value)} /><//>
+          <${AttachPicker} ctx=${ctx} kept=${kept} setKept=${setKept} picked=${picked} setPicked=${setPicked} />
         </div>
         ${err ? html`<div class="err">${err}</div>` : null}
         <div class="row" style="margin-top:10px"><button class="btn pri" id="tax-save" disabled=${busy} onClick=${add}>${busy ? "Salvando…" : editId ? "Salvar alteração" : "Lançar imposto"}</button>${editId ? html`<button class="btn" onClick=${reset}>Cancelar</button>` : null}</div></details>` : null}` : null}
@@ -1334,8 +1456,8 @@ function Cadastros({ ctx }) {
   const { D, api, isAdmin, canWrite, notify } = ctx;
   const [tab, setTab] = useState("suppliers");
   const cfg = ENT[tab];
-  const rows = [...D[tab]].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  const blank = () => Object.fromEntries(cfg.fields.map(([k]) => [k, ""]));
+  const rows = cfg ? [...D[tab]].sort((a, b) => (a.name || "").localeCompare(b.name || "")) : [];
+  const blank = () => (cfg ? Object.fromEntries(cfg.fields.map(([k]) => [k, ""])) : {});
   const [form, setForm] = useState(blank);
   const [edit, setEdit] = useState(null);
   const [err, setErr] = useState(null);
@@ -1377,7 +1499,320 @@ function Backup({ ctx }) {
     <p style="margin:0">Baixa um arquivo com todos os pedidos, cadastros e cotações. Guarde no Google Drive de vez em quando.</p>
     <div class="row"><button class="btn pri" onClick=${() => saveFile("encomendas-backup-" + today() + ".json", JSON.stringify({ exportedAt: new Date().toISOString(), ...D }, null, 2), notify)}>⬇ Baixar backup</button></div>
     <p class="small muted" style="margin:0">${D.orders.length} pedidos · ${D.suppliers.length} fornecedores · ${D.products.length} produtos · ${D.rates.length} cotações</p>
+    <hr style="border:0;border-top:1px solid var(--line);margin:4px 0" />
+    <${Restore} ctx=${ctx} />
   <//>`;
+}
+
+// ---------------- Custo real por peça (precificação) ----------------
+// O custo total do pedido em R$ (o que foi pago + saldo + imposto + despesas) é dividido entre os itens
+// na proporção do valor de cada um. Assim, custo por peça = preço unitário × (custo total ÷ valor dos produtos).
+function costStatus(tt) {
+  const why = [];
+  if (tt.pending > 0.01) why.push("saldo a pagar ao fornecedor");
+  if (tt.taxAwaiting) why.push("imposto ainda não lançado");
+  else if (tt.taxForecastPendingBRL > 0) why.push("imposto previsto, ainda não concluído");
+  if (tt.extrasPendingBRL > 0) why.push("despesas pendentes");
+  if (tt.missingRate) why.push("valor em dólar sem cotação");
+  return { final: why.length === 0, why };
+}
+function itemCosts(o, tt) {
+  const factor = tt.itemsTotal > 0 ? tt.landedBRL / tt.itemsTotal : null;
+  return (o.items || []).map((i) => {
+    const pieces = n0(i.pieces);
+    const cost = factor === null || !(n0(i.unitPrice) > 0) ? null : n0(i.unitPrice) * factor;
+    const good = i.receivedQty != null ? Math.max(n0(i.receivedQty) - n0(i.defectiveQty), 0) : null;
+    const costGood = cost !== null && good !== null && good > 0 && good < pieces ? (cost * pieces) / good : null;
+    return { i, pieces, cost, costGood, good };
+  });
+}
+function salePrice(cost, markup, round90) {
+  if (cost === null || cost === undefined) return null;
+  const p = cost * (1 + n0(markup) / 100);
+  return round90 ? Math.ceil(p - 0.9) + 0.9 : r2(p);
+}
+function arrivalDate(o) {
+  const d = (o.trackings || []).filter((k) => k.received && k.receivedDate).map((k) => k.receivedDate).sort();
+  return d.length ? d[d.length - 1] : null;
+}
+function hasArrived(o, r) { return r.received > 0 || ["recebido_parcial", "recebido", "finalizado"].includes(o.status) || (o.trackings || []).some((k) => k.received); }
+const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00Z") - new Date(a + "T12:00:00Z")) / 86400000);
+function appSettings(D) { const s = D.settings.find((x) => x.id === "app") || {}; return { markup: s.markup ?? 100, round90: !!s.round90 }; }
+
+function MarkupBox({ ctx }) {
+  const { D, api, canWrite, notify } = ctx;
+  const cfg = appSettings(D);
+  const [mk, setMk] = useState(toInput(cfg.markup));
+  useEffect(() => { setMk(toInput(cfg.markup)); }, [cfg.markup]);
+  async function save(next) {
+    const body = { ...cfg, ...next };
+    try { await api.saveEntity("settings", "app", body); notify("Preço sugerido atualizado."); } catch (e) { console.error(e); notify("Não foi possível salvar."); }
+  }
+  const ex = salePrice(40, parseDec(mk) ?? cfg.markup, cfg.round90);
+  return html`<div class="row" style="align-items:flex-end">
+    <${Field} label="Margem sobre o custo" hint=${"Ex.: custo R$ 40,00 → preço " + money(ex)}><span class="money pct" data-sym="%"><input id="mk" inputmode="decimal" value=${mk} disabled=${!canWrite}
+      onInput=${(e) => setMk(e.target.value)} onBlur=${() => { const v = parseDec(mk); if (v !== null && v !== cfg.markup) save({ markup: v }); }} onKeyDown=${(e) => { if (e.key === "Enter") e.target.blur(); }} /></span><//>
+    <label class="chk" style="margin-bottom:22px"><input type="checkbox" id="r90" checked=${cfg.round90} disabled=${!canWrite} onChange=${(e) => save({ round90: e.target.checked })} />Arredondar para ,90</label>
+  </div>`;
+}
+
+function Precos({ ctx }) {
+  const { D, byId, go } = ctx;
+  const cfg = appSettings(D);
+  const [q, setQ] = useState("");
+  const [scope, setScope] = useState("chegaram");
+  const [mode, setMode] = useState("pedido");
+  const k = key(q);
+  const rows = D.orders.filter((o) => o.status !== "cancelado").map((o) => {
+    const tt = totals(o), r = receipt(o);
+    return { o, tt, r, st: costStatus(tt), costs: itemCosts(o, tt), arrived: hasArrived(o, r), arr: arrivalDate(o), sup: byId.suppliers[o.supplierId]?.name || "" };
+  }).filter((x) => scope === "todos" || x.arrived);
+  const itemText = (c) => key((byId.products[c.i.productId]?.name || "") + " " + (c.i.variant || ""));
+  const price = (c) => salePrice(c.cost, cfg.markup, cfg.round90);
+  const pname = (i) => byId.products[i.productId]?.name || "—";
+
+  let body;
+  if (mode === "pedido") {
+    const list = rows.map((x) => {
+      const orderHit = !k || key(x.o.title + " " + x.sup + " #" + x.o.number + " " + x.o.number).includes(k);
+      const items = orderHit ? x.costs : x.costs.filter((c) => itemText(c).includes(k));
+      return { ...x, items };
+    }).filter((x) => x.items.length).sort((a, b) => (b.arr || b.o.orderDate || "").localeCompare(a.arr || a.o.orderDate || "") || (b.o.number || 0) - (a.o.number || 0));
+    body = list.length ? list.map((x) => html`<section class="card" key=${x.o.id}>
+      <div class="ch"><button class="linkish" onClick=${() => go("pedido", { id: x.o.id })}><h2><span class="num">#${x.o.number}</span> ${x.o.title}</h2></button>
+        <${Pill} tone=${x.st.final ? "p-good" : "p-warn"}>${x.st.final ? "Custo final" : "Custo estimado"}<//></div>
+      <div class="cb">
+        <div class="small muted">${[x.sup, x.arr ? "chegou " + fdate(x.arr) : x.arrived ? "chegou" : "ainda não chegou", x.tt.itemsTotal > 0 ? "cada " + (x.tt.cur === "USD" ? "$ 1" : "R$ 1") + " de produto custou " + money(x.tt.landedBRL / x.tt.itemsTotal) + " no final" : null].filter(Boolean).join(" · ")}</div>
+        ${!x.st.final ? html`<div class="small" style="color:var(--warn)">Pode mudar: ${x.st.why.join(", ")}.</div>` : null}
+        <div class="list">${x.items.map((c) => html`<div class="li price-li" key=${c.i.id}>
+          <div style="min-width:0"><strong>${pname(c.i)}</strong>${c.i.variant ? html` <span class="muted">· ${c.i.variant}</span>` : null}
+            <div class="small muted">${num(c.pieces, 0)} peças · produto ${M(c.i.unitPrice, x.tt.cur, x.tt.orate)}</div>
+            ${c.costGood !== null ? html`<div class="small" style="color:var(--warn)">Chegaram ${num(c.good, 0)} boas de ${num(c.pieces, 0)}: por peça boa ${money(c.costGood)}</div>` : null}</div>
+          <div class="price-v"><div class="small muted">Custo/peça</div><strong class="tab big">${c.cost === null ? "—" : money(c.cost)}</strong>
+            <div class="small tab">Venda sugerida <strong>${c.cost === null ? "—" : money(price(c))}</strong></div></div>
+        </div>`)}</div>
+      </div></section>`) : html`<div class="card"><div class="empty">${k ? "Nada encontrado com essa busca." : scope === "chegaram" ? "Nenhum pedido chegou ainda. Veja “Todos os pedidos”." : "Nenhum pedido."}</div></div>`;
+  } else {
+    // Por produto: custo do pedido mais recente e custo médio (ponderado pelas peças)
+    const g = {};
+    for (const x of rows) for (const c of x.costs) {
+      if (c.cost === null) continue;
+      const gk = c.i.productId + "|" + key(c.i.variant || "");
+      const e = (g[gk] = g[gk] || { name: pname(c.i), variant: c.i.variant || "", n: 0, pcs: 0, sum: 0, min: Infinity, max: 0, last: null });
+      e.n++; e.pcs += c.pieces; e.sum += c.cost * c.pieces; e.min = Math.min(e.min, c.cost); e.max = Math.max(e.max, c.cost);
+      const d = x.arr || x.o.orderDate || "";
+      if (!e.last || d > e.last.d || (d === e.last.d && x.o.number > e.last.o.number)) e.last = { d, o: x.o, cost: c.cost, final: x.st.final };
+    }
+    const list = Object.values(g).filter((e) => !k || key(e.name + " " + e.variant).includes(k)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.variant.localeCompare(b.variant, "pt-BR"));
+    body = list.length ? html`<div class="card"><div class="cb"><div class="list">${list.map((e) => html`<div class="li price-li" key=${e.name + e.variant}>
+      <div style="min-width:0"><strong>${e.name}</strong>${e.variant ? html` <span class="muted">· ${e.variant}</span>` : null}
+        <div class="small muted">${e.n} pedido(s) · ${num(e.pcs, 0)} peças${e.n > 1 ? " · média " + money(e.sum / e.pcs) + " · de " + money(e.min) + " a " + money(e.max) : ""}</div>
+        <div class="small muted">Último: <button class="link" onClick=${() => go("pedido", { id: e.last.o.id })}>#${e.last.o.number}</button>${e.last.d ? " (" + fdate(e.last.d) + ")" : ""}${e.last.final ? "" : " · estimado"}</div></div>
+      <div class="price-v"><div class="small muted">Último custo</div><strong class="tab big">${money(e.last.cost)}</strong>
+        <div class="small tab">Venda sugerida <strong>${money(salePrice(e.last.cost, cfg.markup, cfg.round90))}</strong></div></div></div>`)}</div></div></div>`
+      : html`<div class="card"><div class="empty">Nada encontrado.</div></div>`;
+  }
+
+  return html`<${Head} title="Preços" />
+    <${Card} title="Custo real por peça">
+      <p class="small muted" style="margin:0">Custo de cada modelo já com frete, imposto, despesas e o dólar que você realmente pagou. Use para precificar quando a mercadoria chegar.</p>
+      <${MarkupBox} ctx=${ctx} />
+      <input id="pq" placeholder="Buscar modelo, fornecedor ou nº do pedido" value=${q} onInput=${(e) => setQ(e.target.value)} />
+      <div class="row">
+        <div class="seg">${[["chegaram", "Já chegaram"], ["todos", "Todos"]].map(([v, l]) => html`<button key=${v} class=${scope === v ? "on" : ""} onClick=${() => setScope(v)}>${l}</button>`)}</div>
+        <div class="seg">${[["pedido", "Por pedido"], ["produto", "Por modelo"]].map(([v, l]) => html`<button key=${v} class=${mode === v ? "on" : ""} onClick=${() => setMode(v)}>${l}</button>`)}</div>
+      </div>
+    <//>
+    ${body}`;
+}
+
+// ---------------- Análises ----------------
+const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const monthLabel = (ym) => MONTHS[Number(ym.slice(5, 7)) - 1] + "/" + ym.slice(2, 4);
+function addMonths(ym, n) { const [y, m] = ym.split("-").map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); return d.toISOString().slice(0, 7); }
+// Barras horizontais simples (uma série): rótulo e valor em texto, barra só como apoio visual
+function Bars({ rows, fmt }) {
+  const max = Math.max(0, ...rows.map((r) => r.value));
+  return html`<div class="bars">${rows.map((r) => html`<div class=${cx("bar-row", r.onClick && "click")} key=${r.key || r.label} title=${r.label + ": " + fmt(r.value)} onClick=${r.onClick}>
+    <div class="bar-top"><span class="bar-l">${r.label}</span><span class="tab bar-v">${fmt(r.value)}${r.sub ? html` <span class="muted small">${r.sub}</span>` : null}</span></div>
+    <div class="bar-t"><div class="bar-f" style=${"width:" + (max > 0 && r.value > 0 ? Math.max((r.value / max) * 100, 1.5) : 0) + "%"}></div></div></div>`)}</div>`;
+}
+function Analises({ ctx }) {
+  const { D, byId, go, today: t, setFilters } = ctx;
+  const [per, setPer] = useState("6");
+  const cur = t.slice(0, 7);
+  const fromYm = per === "tudo" ? null : per === "ano" ? t.slice(0, 4) + "-01" : addMonths(cur, -(Number(per) - 1));
+  const all = D.orders.filter((o) => o.status !== "cancelado").map((o) => ({ o, t: totals(o), r: receipt(o) }));
+  const rows = all.filter((x) => !fromYm || (x.o.orderDate && x.o.orderDate.slice(0, 7) >= fromYm));
+  const sum = (l, f) => l.reduce((s, x) => s + f(x), 0);
+  const landed = sum(rows, (x) => x.t.landedBRL), pcs = sum(rows, (x) => x.t.pieces);
+  const tax = sum(rows, (x) => x.t.taxTotalBRL);
+
+  // Gasto por mês
+  const byM = {};
+  for (const x of rows) if (x.o.orderDate) byM[x.o.orderDate.slice(0, 7)] = (byM[x.o.orderDate.slice(0, 7)] || 0) + x.t.landedBRL;
+  let months = Object.keys(byM).sort();
+  if (fromYm) { months = []; for (let m = fromYm; m <= cur; m = addMonths(m, 1)) months.push(m); }
+  // Por fornecedor
+  const bySup = {};
+  for (const x of rows) { const k = x.o.supplierId || "sem"; const e = (bySup[k] = bySup[k] || { id: x.o.supplierId, name: byId.suppliers[x.o.supplierId]?.name || "Sem fornecedor", v: 0, n: 0, p: 0 }); e.v += x.t.landedBRL; e.n++; e.p += x.t.pieces; }
+  const sups = Object.values(bySup).sort((a, b) => b.v - a.v);
+  // Prazo real de entrega e imposto por modalidade / transportadora
+  const group = (field, coll) => {
+    const g = {};
+    for (const x of rows) {
+      const id = x.o[field] || "sem";
+      const e = (g[id] = g[id] || { name: byId[coll][x.o[field]]?.name || "Não informado", n: 0, days: [], late: [], taxV: 0, base: 0, taxN: 0 });
+      e.n++;
+      const arr = arrivalDate(x.o);
+      if (arr && x.o.orderDate) { e.days.push(daysBetween(x.o.orderDate, arr)); if (x.o.expectedDate) e.late.push(daysBetween(x.o.expectedDate, arr)); }
+      const resolved = x.o.taxMode === "sem" || x.o.taxMode === "incluso" || x.o.taxDone || x.t.taxPaidBRL > 0;
+      if (resolved && x.t.supplierTotalBRL > 0) { e.taxV += x.t.taxTotalBRL; e.base += x.t.supplierTotalBRL; e.taxN++; }
+    }
+    return Object.values(g).sort((a, b) => b.n - a.n);
+  };
+  const avg = (l) => (l.length ? l.reduce((s, v) => s + v, 0) / l.length : null);
+  const DelTable = ({ list, title }) => html`<div class="tablewrap"><table><thead><tr><th>${title}</th><th class="r">Pedidos</th><th class="r">Chegaram</th><th class="r">Prazo médio</th><th class="r">vs. previsão</th><th class="r">Imposto</th></tr></thead><tbody>
+    ${list.map((e) => { const a = avg(e.days), l = avg(e.late); return html`<tr key=${e.name}><td>${e.name}</td><td class="r">${e.n}</td><td class="r">${e.days.length}</td>
+      <td class="r">${a === null ? "—" : num(a, 0) + " dias"}</td>
+      <td class="r" style=${l === null ? "" : l > 0.5 ? "color:var(--bad)" : "color:var(--good)"}>${l === null ? "—" : l > 0.5 ? num(l, 0) + " dias atrasado" : l < -0.5 ? num(-l, 0) + " dias antes" : "no prazo"}</td>
+      <td class="r" title=${e.taxN + " pedido(s) com imposto resolvido"}>${e.base > 0 ? num((e.taxV / e.base) * 100, 1) + "%" : "—"}</td></tr>`; })}</tbody></table></div>`;
+
+  // Pagamentos a fazer (todos os períodos), pela data prevista de chegada
+  const toPay = all.filter((x) => x.t.pending > 0.01 || x.t.taxForecastPendingBRL > 0)
+    .map((x) => ({ ...x, pay: (x.t.pending > 0.01 ? x.t.pendingBRL : 0), taxP: x.t.taxForecastPendingBRL }))
+    .sort((a, b) => (a.o.expectedDate || "9999").localeCompare(b.o.expectedDate || "9999") || a.o.number - b.o.number);
+  let run = 0;
+
+  return html`<${Head} title="Análises" />
+    <div class="seg" style="align-self:flex-start">${[["3", "3 meses"], ["6", "6 meses"], ["12", "12 meses"], ["ano", "Este ano"], ["tudo", "Tudo"]].map(([v, l]) => html`<button key=${v} class=${per === v ? "on" : ""} onClick=${() => setPer(v)}>${l}</button>`)}</div>
+    <div class="stats">
+      <${Stat} label="Total comprado" value=${money(landed)} sub="Pedido + frete + imposto + despesas" />
+      <${Stat} label="Pedidos" value=${rows.length} />
+      <${Stat} label="Peças" value=${num(pcs, 0)} />
+      <${Stat} label="Custo médio por peça" value=${pcs > 0 ? money(landed / pcs) : "—"} />
+      <${Stat} label="Imposto pago" value=${money(tax)} sub=${landed > 0 ? num((tax / landed) * 100, 1) + "% do total comprado" : null} />
+    </div>
+    <div class="cols2">
+      <${Card} title="Gasto por mês (data do pedido)">${months.length ? html`<${Bars} fmt=${money} rows=${months.map((m) => ({ key: m, label: monthLabel(m), value: byM[m] || 0 }))} />` : html`<div class="empty">Sem pedidos no período.</div>`}<//>
+      <${Card} title="Por fornecedor">${sups.length ? html`<${Bars} fmt=${money} rows=${sups.map((s) => ({ key: s.name, label: s.name, value: s.v, sub: "· " + s.n + " ped. · " + (s.p > 0 ? money(s.v / s.p) + "/peça" : ""), onClick: s.id ? () => { setFilters({ fornecedor: s.id }); go("pedidos"); } : null }))} />` : html`<div class="empty">Sem pedidos no período.</div>`}<//>
+    </div>
+    <${Card} title="Prazo de entrega e imposto por modalidade">
+      <${DelTable} list=${group("modeId", "modes")} title="Modalidade" />
+      <p class="small muted" style="margin:0">Prazo = da data do pedido até o último rastreio marcado como recebido. Imposto = imposto ÷ valor do pedido, só em pedidos com imposto já resolvido.</p>
+    <//>
+    <${Card} title="Prazo de entrega e imposto por transportadora"><${DelTable} list=${group("carrierId", "carriers")} title="Transportadora" /><//>
+    <${Card} title=${"Pagamentos a fazer (" + toPay.length + ")"}>${toPay.length ? html`<div class="tablewrap"><table><thead><tr><th>Chegada prevista</th><th>Pedido</th><th class="r">A pagar ao fornecedor</th><th class="r">Imposto previsto</th><th class="r">Acumulado</th></tr></thead><tbody>
+      ${toPay.map((x) => { run += x.pay + x.taxP; return html`<tr key=${x.o.id} style="cursor:pointer" onClick=${() => go("pedido", { id: x.o.id })}><td>${fdate(x.o.expectedDate)}</td><td><span class="num">#${x.o.number}</span> ${x.o.title}</td>
+        <td class="r">${x.pay > 0 ? money(x.pay) : "—"}</td><td class="r">${x.taxP > 0 ? money(x.taxP) : "—"}</td><td class="r"><strong>${money(run)}</strong></td></tr>`; })}
+      </tbody></table></div>` : html`<div class="empty">Nada a pagar.</div>`}<//>`;
+}
+
+// ---------------- Alertas ----------------
+function alertsFor(o, t, r, today) {
+  const a = [];
+  const open = !CLOSED.includes(o.status);
+  if (o.needsReview) a.push(["p-warn", "Revisar"]);
+  if (t.taxAwaiting) a.push(["p-acc", "Imposto a lançar"]);
+  if (r.status === "divergencia") a.push(["p-bad", "Divergência"]);
+  if (open && ["enviado", "em_transporte"].includes(o.status) && !(o.trackings || []).length) a.push(["p-warn", "Enviado sem rastreio"]);
+  const stale = open ? (o.trackings || []).filter((k) => !k.received && k.statusAt && daysBetween(k.statusAt.slice(0, 10), today) >= 10) : [];
+  if (stale.length) a.push(["p-warn", stale.length + " rastreio(s) parado(s) há 10+ dias"]);
+  if (open && t.pending > 0.01 && o.expectedDate && daysBetween(today, o.expectedDate) <= 7) a.push(["p-bad", daysBetween(today, o.expectedDate) < 0 ? "Previsão passou e tem saldo a pagar" : "Chega em até 7 dias com saldo a pagar"]);
+  return a;
+}
+
+// ---------------- Histórico ----------------
+function fdatetime(iso) { if (!iso) return "—"; const d = new Date(iso); return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d); }
+function History({ ctx, o }) {
+  const list = [...(o.history || [])].reverse();
+  const [names, setNames] = useState({});
+  const [all, setAll] = useState(false);
+  const ids = [...new Set(list.map((x) => x.by).filter(Boolean))];
+  useEffect(() => {
+    if (!ids.length || !ctx.st.user) return;
+    let alive = true;
+    ctx.st.user.profiles(ids).then((ps) => { if (alive) setNames(Object.fromEntries(Object.entries(ps || {}).map(([k, p]) => [k, p?.name || ""]))); }).catch(() => {});
+    return () => { alive = false; };
+  }, [ids.join(",")]);
+  const who = (by) => (by && by === ctx.st.meId ? "Você" : names[by] || "Alguém");
+  const shown = all ? list : list.slice(0, 8);
+  return html`<${Card} title=${"Histórico de alterações (" + list.length + ")"}>
+    ${list.length ? html`<div class="list">${shown.map((x, i) => html`<div class="li" key=${x.at + i} style="align-items:flex-start"><div style="min-width:0"><div>${x.what}</div><div class="small muted">${fdatetime(x.at)} · ${who(x.by)}</div></div></div>`)}</div>
+      ${list.length > 8 ? html`<div><button class="link" onClick=${() => setAll(!all)}>${all ? "Mostrar menos" : "Mostrar tudo"}</button></div>` : null}`
+      : html`<div class="empty">As alterações feitas a partir de agora aparecem aqui, com data, hora e quem fez.</div>`}
+  <//>`;
+}
+
+// ---------------- Comprovantes (anexos) ----------------
+const FILE_TYPES = /^(image\/(png|jpeg|gif|webp|heic|heif)|application\/pdf)$/;
+async function uploadAll(assets, files) {
+  const out = [];
+  for (const f of files) {
+    const type = FILE_TYPES.test(f.type) ? f.type : /\.pdf$/i.test(f.name) ? "application/pdf" : /\.jpe?g$/i.test(f.name) ? "image/jpeg" : /\.png$/i.test(f.name) ? "image/png" : f.type || undefined;
+    const r = await assets.upload(f, type ? { type } : undefined);
+    out.push({ id: r.id, name: f.name || "comprovante", type: r.contentType });
+  }
+  return out;
+}
+const uploadErr = (e) => ({ too_large: "Arquivo grande demais (máx. 20 MB).", unsupported_type: "Tipo de arquivo não aceito. Use foto (JPG/PNG) ou PDF.", quota_exceeded: "Espaço de arquivos do app cheio." }[e?.code] || "Não foi possível anexar o comprovante.");
+function removeAssets(ctx, files) { const a = ctx.st.assets; if (!a) return; for (const f of files || []) a.delete(f.id).catch(() => {}); }
+function FileLinks({ files }) {
+  return (files || []).length ? html`<div class="row" style="gap:6px;margin-top:2px">${files.map((f) => html`<a key=${f.id} class="clip" href=${"/_blob/" + f.id} target="_blank" rel="noopener">📎 ${f.name}</a>`)}</div>` : null;
+}
+function AttachPicker({ ctx, kept, setKept, picked, setPicked }) {
+  if (!ctx.st.assets) return kept.length ? html`<${FileLinks} files=${kept} />` : null;
+  return html`<div class="f span-all"><span class="small muted">Comprovantes (foto ou PDF) — opcional</span>
+    <div class="row" style="gap:6px">
+      ${kept.map((f) => html`<span class="clip" key=${f.id}><a href=${"/_blob/" + f.id} target="_blank" rel="noopener">📎 ${f.name}</a><button type="button" class="x" aria-label="Remover" onClick=${() => setKept(kept.filter((x) => x.id !== f.id))}>×</button></span>`)}
+      ${picked.map((f, i) => html`<span class="clip" key=${"n" + i}>📎 ${f.name}<button type="button" class="x" aria-label="Remover" onClick=${() => setPicked(picked.filter((_, j) => j !== i))}>×</button></span>`)}
+      <label class="btn sm">+ Anexar<input type="file" accept="image/*,application/pdf" multiple style="display:none" onChange=${(e) => { setPicked([...picked, ...Array.from(e.target.files || [])]); e.target.value = ""; }} /></label>
+    </div></div>`;
+}
+
+// ---------------- Restaurar backup ----------------
+function Restore({ ctx }) {
+  const { D, api, isAdmin, notify } = ctx;
+  const [bk, setBk] = useState(null);
+  const [err, setErr] = useState(null);
+  const [prog, setProg] = useState(null);
+  async function onFile(e) {
+    setErr(null); setBk(null); setProg(null);
+    const f = e.target.files?.[0]; e.target.value = "";
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (!data || !Array.isArray(data.orders)) throw new Error("formato");
+      const cols = Object.keys(COLS).filter((c) => Array.isArray(data[c]));
+      for (const c of cols) if (data[c].some((d) => !d || typeof d.id !== "string" || !d.id)) throw new Error("formato");
+      setBk({ name: f.name, data, cols });
+    } catch (x) { setErr("Esse arquivo não é um backup válido deste app."); }
+  }
+  async function run() {
+    const jobs = [];
+    for (const c of bk.cols) for (const d of bk.data[c]) { const { id, ...body } = d; jobs.push([c, id, body]); }
+    setProg({ done: 0, total: jobs.length });
+    try {
+      for (let i = 0; i < jobs.length; i++) { await api.saveEntity(...jobs[i]); setProg({ done: i + 1, total: jobs.length }); }
+      notify("Backup restaurado."); setBk(null);
+    } catch (x) { console.error(x); setErr("A restauração parou no meio (" + (x?.code || "erro") + "). Tente de novo: o que já foi gravado continua certo."); }
+  }
+  if (!isAdmin) return html`<p class="small muted" style="margin:0">Só o dono do app pode restaurar um backup.</p>`;
+  const orders = bk ? bk.data.orders : [];
+  const same = orders.filter((o) => D.orders.some((x) => x.id === o.id)).length;
+  return html`<div style="display:grid;gap:10px">
+    <strong>Restaurar backup</strong>
+    <p class="small muted" style="margin:0">Carrega um arquivo baixado acima. Pedidos e cadastros do arquivo substituem os de mesmo registro no app e os que faltam são recriados. Nada que está só no app é apagado.</p>
+    <div><label class="btn">Escolher arquivo de backup<input type="file" accept=".json,application/json" style="display:none" onChange=${onFile} /></label></div>
+    ${err ? html`<div class="err">${err}</div>` : null}
+    ${bk ? html`<div class="banner b-warn" style="display:grid;gap:8px">
+      <div><strong>${bk.name}</strong>${bk.data.exportedAt ? " — gerado em " + fdatetime(bk.data.exportedAt) : ""}</div>
+      <div class="small">${bk.cols.map((c) => bk.data[c].length + " " + ({ orders: "pedidos", suppliers: "fornecedores", products: "produtos", modes: "modalidades", carriers: "transportadoras", methods: "formas de pagamento", rates: "cotações", settings: "configurações" }[c] || c)).join(" · ")}</div>
+      <div class="small">${same} pedido(s) já existem e voltarão a ficar como no backup; ${orders.length - same} serão recriados. Alterações feitas nesses pedidos depois do backup serão perdidas.</div>
+      <div class="small">Dica: baixe um backup atual antes de restaurar.</div>
+      ${prog ? html`<div class="small">Gravando ${prog.done} de ${prog.total}…</div>` : html`<div class="row"><button class="btn pri" id="restore-go" onClick=${run}>Restaurar agora</button><button class="btn" onClick=${() => setBk(null)}>Cancelar</button></div>`}
+    </div>` : null}
+  </div>`;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
