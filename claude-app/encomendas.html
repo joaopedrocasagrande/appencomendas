@@ -209,8 +209,8 @@ const key = (s) => norm(s).toLowerCase();
 const cx = (...a) => a.filter(Boolean).join(" ");
 
 // ---------------- Rótulos ----------------
-const ORDER_STATUS = { cotacao: "Cotação", confirmado: "Confirmado", em_producao: "Em produção", enviado: "Enviado", recebido_parcial: "Recebido parcialmente", recebido: "Recebido", finalizado: "Finalizado", cancelado: "Cancelado" };
-const ORDER_TONE = { cotacao: "", confirmado: "p-info", em_producao: "p-info", enviado: "p-warn", recebido_parcial: "p-warn", recebido: "p-good", finalizado: "p-good", cancelado: "p-bad" };
+const ORDER_STATUS = { cotacao: "Cotação", confirmado: "Confirmado", em_producao: "Em produção", enviado: "Enviado", em_transporte: "Em transporte", recebido_parcial: "Recebido parcialmente", recebido: "Recebido", finalizado: "Finalizado", cancelado: "Cancelado" };
+const ORDER_TONE = { cotacao: "", confirmado: "p-info", em_producao: "p-info", enviado: "p-warn", em_transporte: "p-info", recebido_parcial: "p-warn", recebido: "p-good", finalizado: "p-good", cancelado: "p-bad" };
 const CLOSED = ["recebido", "finalizado", "cancelado"];
 const TRK_STATUS = { aguardando_postagem: "Aguardando postagem", postado: "Postado", em_transito: "Em trânsito", fiscalizacao: "Fiscalização / Alfândega", aguardando_pagamento: "Aguardando pagamento de imposto", saiu_entrega: "Saiu para entrega", entregue: "Entregue", devolvido: "Devolvido", extraviado: "Extraviado" };
 const TRK_TONE = { aguardando_postagem: "", postado: "p-info", em_transito: "p-info", fiscalizacao: "p-warn", aguardando_pagamento: "p-warn", saiu_entrega: "p-info", entregue: "p-good", devolvido: "p-bad", extraviado: "p-bad" };
