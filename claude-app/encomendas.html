@@ -248,19 +248,21 @@ function totals(o) {
   const orate = o.rate > 0 ? o.rate : FALLBACK_RATE;
   let missingRate = false;
   const to = (amt, from, rate, target) => { const v = convert(amt, from, target, rate || orate); if (v === null) { missingRate = true; return 0; } return v; };
+  // Pagamento/imposto: se o valor convertido foi digitado (ou salvo), usa ele em vez de recalcular pela cotação
+  const payTo = (p, target) => (p.currency === target ? n0(p.amount) : target === "BRL" && p.brlAmount != null ? n0(p.brlAmount) : target === "USD" && p.usdAmount != null ? n0(p.usdAmount) : to(n0(p.amount), p.currency, p.rate, target));
   const items = o.items || [], expenses = o.expenses || [], pays = o.payments || [], taxes = o.taxPayments || [];
   const pieces = items.reduce((s, i) => s + n0(i.pieces), 0);
   const itemsTotal = items.reduce((s, i) => s + n0(i.pieces) * n0(i.unitPrice), 0);
   const supplierExpenses = expenses.filter((e) => e.chargedBySupplier).reduce((s, e) => s + to(n0(e.amount), e.currency, null, cur), 0);
   const supplierTotal = r2(itemsTotal + n0(o.freight) - n0(o.discount) + supplierExpenses);
-  const paid = r2(pays.reduce((s, p) => s + to(n0(p.amount), p.currency, p.rate, cur), 0));
+  const paid = r2(pays.reduce((s, p) => s + payTo(p, cur), 0));
   const pending = r2(supplierTotal - paid);
   let payStatus = "pendente";
   if (supplierTotal <= 0 && paid <= 0) payStatus = "pendente";
   else if (pending < -0.01) payStatus = "pago_a_mais";
   else if (pending <= 0.01) payStatus = "pago";
   else if (paid > 0) payStatus = "parcial";
-  const taxPaidBRL = r2(o.taxMode === "por_fora" ? taxes.reduce((s, t) => s + to(n0(t.amount), t.currency, t.rate, "BRL"), 0) : 0);
+  const taxPaidBRL = r2(o.taxMode === "por_fora" ? taxes.reduce((s, t) => s + payTo(t, "BRL"), 0) : 0);
   const otherBRL = expenses.filter((e) => !e.chargedBySupplier).reduce((s, e) => s + to(n0(e.amount), e.currency, null, "BRL"), 0);
   const extrasBRL = r2(taxPaidBRL + otherBRL);
   const extrasPendingBRL = r2(expenses.filter((e) => !e.chargedBySupplier && !e.paid).reduce((s, e) => s + to(n0(e.amount), e.currency, null, "BRL"), 0));
@@ -269,7 +271,7 @@ function totals(o) {
   const taxForecastBRL = o.taxMode === "por_fora" ? r2(n0(o.taxForecast)) : 0;
   const taxForecastPendingBRL = o.taxMode === "por_fora" && !o.taxDone ? r2(Math.max(taxForecastBRL - taxPaidBRL, 0)) : 0;
   const taxIncludedBRL = o.taxMode === "incluso" ? r2(to(n0(o.taxAmount), cur, null, "BRL")) : 0;
-  const paidBRL = pays.reduce((s, p) => s + to(n0(p.amount), p.currency, p.rate, "BRL"), 0);
+  const paidBRL = pays.reduce((s, p) => s + payTo(p, "BRL"), 0);
   const pendingBRL = to(Math.max(pending, 0), cur, null, "BRL");
   const landedBRL = r2(paidBRL + pendingBRL + extrasBRL + taxForecastPendingBRL);
   return {
@@ -300,6 +302,41 @@ function M(v, cur, rate, block) {
   if (b === null) return html`${money(v, "USD")}<span class=${cx("brl", block && "blk")}>sem cotação</span>`;
   return html`${money(b)}<span class=${cx("brl", block && "blk")}>${money(v, "USD")}</span>`;
 }
+// Campo de conversão (R$ <-> $): calculado pela cotação, mas pode ser digitado à mão
+function useConv() {
+  const [val, setVal] = useState("");
+  const [manual, setManual] = useState(false);
+  return { val, setVal, manual, setManual, clear() { setVal(""); setManual(false); } };
+}
+const convAuto = (amount, from, target, rate) => { const a = parseDec(amount), r = parseDec(rate); return a && r ? r2(convert(a, from, target, r)) : null; };
+// Carrega o valor convertido de um lançamento salvo (edição)
+function convLoad(cv, x, target) {
+  const saved = target === "BRL" ? x.brlAmount : x.usdAmount;
+  const auto = x.rate ? r2(convert(x.amount, x.currency, target, x.rate)) : null;
+  if (saved != null && (auto === null || Math.abs(saved - auto) > 0.009)) { cv.setVal(toInput(saved)); cv.setManual(true); } else cv.clear();
+}
+// Resultado para salvar: cotação efetiva + valor convertido
+function convResult(a, from, target, r, cv) {
+  const m = cv.manual ? parseDec(cv.val) : null;
+  if (m && m > 0) {
+    const rate = target === "BRL" ? m / a : a / m;
+    return { rate, brlAmount: target === "BRL" ? m : a, usdAmount: target === "USD" ? m : a };
+  }
+  if (!r) return null;
+  const c = r2(convert(a, from, target, r));
+  return { rate: r, brlAmount: target === "BRL" ? c : a, usdAmount: target === "USD" ? c : a };
+}
+function convField(cv, amount, from, target, rate, id) {
+  const auto = convAuto(amount, from, target, rate);
+  const a = parseDec(amount), m = parseDec(cv.val);
+  const eff = cv.manual && a && m ? (target === "BRL" ? m / a : a / m) : null;
+  return html`<${Field} label=${target === "BRL" ? "Valor em reais" : "Equivale em dólar"} hint=${cv.manual
+      ? html`Digitado à mão${eff ? " · cotação efetiva " + money(eff) : ""} · <button type="button" class="link" onClick=${() => cv.clear()}>calcular pela cotação</button>`
+      : "Calculado pela cotação. Pode editar se não bater."}>
+    <span class="money" data-sym=${SYM(target)}><input id=${id} inputmode="decimal" value=${cv.manual ? cv.val : auto === null ? "" : toInput(auto)} placeholder="0,00"
+      onInput=${(e) => { cv.setVal(e.target.value); cv.setManual(e.target.value.trim() !== ""); }} /></span><//>`;
+}
+
 // Dica para campos digitados em dólar: "= R$ X"
 const brlHint = (val, cur, rate) => { if (cur !== "USD") return null; const v = parseDec(val); if (!v) return null; const b = toBRLv(v, "USD", rate); return b === null ? "Defina a cotação para ver em reais" : "= " + money(b); };
 const isLate = (o) => !!o.expectedDate && o.expectedDate < today() && !CLOSED.includes(o.status);
@@ -677,8 +714,8 @@ function ExportButton({ ctx, list }) {
         const sup = byId.suppliers[o.supplierId]?.name || "";
         P.push({ "Nº": o.number, "Título": o.title, "Fornecedor": sup, "Data do pedido": fdate(o.orderDate), "Previsão": fdate(o.expectedDate), "Modalidade": byId.modes[o.modeId]?.name || "", "Transportadora": byId.carriers[o.carrierId]?.name || "", "Status": ORDER_STATUS[o.status], "Moeda": cur(o.currency), "Cotação": o.rate || "", "Peças": t.pieces, "Produtos": t.itemsTotal, "Frete": t.freight, "Desconto": t.discount, "Despesas do fornecedor": t.supplierExpenses, "Total ao fornecedor": t.supplierTotal, "Total ao fornecedor (R$)": t.supplierTotalBRL, "Pago": t.paid, "Pago (R$)": t.paidBRL, "Falta pagar": t.pending, "Falta pagar (R$)": t.pending > 0 ? t.pendingBRL : 0, "Pagamento": PAY_LABEL[t.payStatus], "Imposto": TAX_LABEL[o.taxMode], "Imposto (R$)": t.taxTotalBRL, "Imposto previsto (R$)": t.taxForecastBRL || "", "Imposto previsto a pagar (R$)": t.taxForecastPendingBRL || "", "Imposto concluído": o.taxMode === "por_fora" ? (o.taxDone ? "Sim" : "Não") : "", "Imposto/despesas à parte (R$)": t.extrasBRL, "Custo total (R$)": t.landedBRL, "Custo por peça (R$)": t.costPerPiece ? r2(t.costPerPiece) : "", "Recebimento": REC_LABEL[r.status], "Peças recebidas": r.received, "Com defeito": r.defective, "Rastreios": (o.trackings || []).length, "Observações": o.notes || "" });
         for (const i of o.items || []) I.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Produto": byId.products[i.productId]?.name || "", "Variação": i.variant || "", "Caixas": i.boxes ?? "", "Peças/caixa": i.ppb ?? "", "Grades": i.grids ?? "", "Peças/grade": i.ppg ?? "", "Total de peças": i.pieces, "Valor unitário": i.unitPrice, "Moeda": cur(o.currency), "Total": r2(n0(i.pieces) * n0(i.unitPrice)), "Total (R$)": r2(convert(n0(i.pieces) * n0(i.unitPrice), o.currency || "BRL", "BRL", t.orate) || 0), "Tamanhos": i.sizes ? Object.entries(i.sizes).map(([s, q]) => s + ": " + q).join(", ") : "", "Recebido": i.receivedQty ?? "", "Com defeito": i.defectiveQty ?? "", "Obs. conferência": i.checkNotes || "" });
-        for (const p of o.payments || []) PG.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Data": fdate(p.date), "Valor": p.amount, "Moeda": cur(p.currency), "Cotação": p.rate || "", "Valor em R$": r2(convert(p.amount, p.currency, "BRL", p.rate || t.orate) || 0), "Forma de pagamento": byId.methods[p.methodId]?.name || "", "Observação": p.notes || "" });
-        for (const x of o.taxPayments || []) IM.push({ "Nº pedido": o.number, "Pedido": o.title, "Data": fdate(x.date), "Valor": x.amount, "Moeda": cur(x.currency), "Cotação": x.rate || "", "Valor em R$": r2(convert(x.amount, x.currency, "BRL", x.rate || t.orate) || 0), "Pacote": (o.trackings || []).find((k) => k.id === x.trackingId)?.code || "Pedido todo", "Observação": x.notes || "" });
+        for (const p of o.payments || []) PG.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Data": fdate(p.date), "Valor": p.amount, "Moeda": cur(p.currency), "Cotação": p.rate ? Math.round(p.rate * 10000) / 10000 : "", "Valor em R$": p.currency === "BRL" ? p.amount : p.brlAmount ?? r2(convert(p.amount, p.currency, "BRL", p.rate || t.orate) || 0), "Forma de pagamento": byId.methods[p.methodId]?.name || "", "Observação": p.notes || "" });
+        for (const x of o.taxPayments || []) IM.push({ "Nº pedido": o.number, "Pedido": o.title, "Data": fdate(x.date), "Valor": x.amount, "Moeda": cur(x.currency), "Cotação": x.rate ? Math.round(x.rate * 10000) / 10000 : "", "Valor em R$": x.currency === "BRL" ? x.amount : x.brlAmount ?? r2(convert(x.amount, x.currency, "BRL", x.rate || t.orate) || 0), "Pacote": (o.trackings || []).find((k) => k.id === x.trackingId)?.code || "Pedido todo", "Observação": x.notes || "" });
         for (const k of o.trackings || []) R.push({ "Nº pedido": o.number, "Pedido": o.title, "Código": k.code, "Conteúdo": k.label || "", "Transportadora": byId.carriers[k.carrierId]?.name || "", "Status": TRK_STATUS[k.status], "Recebido": k.received ? "Sim" : "Não", "Data recebimento": fdate(k.receivedDate), "Observação": k.notes || "" });
       }
       const wb = X.utils.book_new();
@@ -958,12 +995,17 @@ function Payments({ ctx, o, tt, patch }) {
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState(null);
   const formRef = useRef(null);
+  const cv = useConv();
+  // Pagamento em dólar: mostra o valor em reais. Pagamento em reais num pedido em dólar: mostra quanto equivale em dólar.
+  const convTarget = currency === "USD" ? "BRL" : o.currency === "USD" ? "USD" : null;
   function reset() {
-    setEditId(null); setDate(t); setAmount(""); setCurrency(o.currency); setRate(toInput(rateFor(D.rates, t)?.usdBrl ?? o.rate)); setMethod(""); setNotes(""); setErr(null);
+    setEditId(null); setDate(t); setAmount(""); setCurrency(o.currency); setRate(toInput(rateFor(D.rates, t)?.usdBrl ?? o.rate)); setMethod(""); setNotes(""); setErr(null); cv.clear();
   }
   function startEdit(p) {
     setEditId(p.id); setDate(p.date || ""); setAmount(toInput(p.amount)); setCurrency(p.currency || o.currency);
     setRate(toInput(p.rate ?? rateFor(D.rates, p.date || t)?.usdBrl ?? o.rate)); setMethod(byId.methods[p.methodId]?.name || ""); setNotes(p.notes || ""); setErr(null);
+    const tg = (p.currency || o.currency) === "USD" ? "BRL" : o.currency === "USD" ? "USD" : null;
+    if (tg) convLoad(cv, p, tg); else cv.clear();
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
   }
   async function add() {
@@ -971,18 +1013,19 @@ function Payments({ ctx, o, tt, patch }) {
     const a = parseDec(amount), r = parseDec(rate);
     if (!date) return setErr("Informe a data.");
     if (!a || a <= 0) return setErr("Informe o valor pago.");
-    if (currency !== o.currency && !r) return setErr("Informe a cotação usada neste pagamento.");
+    const conv = convTarget ? convResult(a, currency, convTarget, r, cv) : null;
+    if (convTarget && !conv) return setErr("Informe a cotação ou o valor convertido deste pagamento.");
     setBusy(true);
     try {
       const methodId = await resolveName(api, D.methods, "methods", method);
-      const pay = { id: editId || uid(), date, amount: a, currency, rate: r || null, methodId, notes: notes.trim() || null };
+      const pay = { id: editId || uid(), date, amount: a, currency, rate: conv ? conv.rate : r || null, brlAmount: conv ? r2(conv.brlAmount) : null, usdAmount: conv ? r2(conv.usdAmount) : null, methodId, notes: notes.trim() || null };
       if (editId) {
         if (!(o.payments || []).some((x) => x.id === editId)) { reset(); return setErr("Este pagamento foi excluído por outra pessoa."); }
         await api.patchOrder(o.id, { payments: o.payments.map((x) => (x.id === editId ? { ...x, ...pay } : x)) });
         reset(); notify("Pagamento alterado.");
       } else {
         await api.patchOrder(o.id, { payments: [...(o.payments || []), pay] });
-        setAmount(""); setNotes(""); notify("Pagamento lançado.");
+        setAmount(""); setNotes(""); cv.clear(); notify("Pagamento lançado.");
       }
     } catch (e) { console.error(e); setErr(editId ? "Não foi possível salvar a alteração. Tente de novo." : "Não foi possível lançar. Tente de novo."); }
     setBusy(false);
@@ -990,8 +1033,9 @@ function Payments({ ctx, o, tt, patch }) {
   const pays = [...(o.payments || [])].sort((a, b) => (a.date < b.date ? -1 : 1));
   return html`<${Card} title=${"Pagamentos ao fornecedor (" + pays.length + ")"}>
     ${pays.length === 0 ? html`<div class="empty">Nenhum pagamento lançado.</div>` : html`<div class="list">${pays.map((p) => {
-      const inOrder = convert(p.amount, p.currency, o.currency, p.rate || tt.orate);
-      return html`<div class="li" key=${p.id} style=${editId === p.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(p.date)} · ${M(p.amount, p.currency, p.rate || tt.orate)}</strong>${p.currency !== o.currency && inOrder !== null ? html` <span class="muted">(${money(inOrder, o.currency)})</span>` : null}
+      const inOrder = p.currency === o.currency ? p.amount : o.currency === "USD" && p.usdAmount != null ? p.usdAmount : o.currency === "BRL" && p.brlAmount != null ? p.brlAmount : convert(p.amount, p.currency, o.currency, p.rate || tt.orate);
+      const inBRL = p.currency === "USD" ? (p.brlAmount ?? convert(p.amount, "USD", "BRL", p.rate || tt.orate)) : p.amount;
+      return html`<div class="li" key=${p.id} style=${editId === p.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(p.date)} · ${p.currency === "USD" ? html`${inBRL === null ? money(p.amount, "USD") : money(inBRL)}<span class="brl">${money(p.amount, "USD")}</span>` : money(p.amount)}</strong>${p.currency === "BRL" && o.currency === "USD" && inOrder !== null ? html`<span class="brl">${money(inOrder, "USD")}</span>` : null}
         <div class="small muted">${[byId.methods[p.methodId]?.name, p.rate ? "cotação " + money(p.rate) : null, p.notes].filter(Boolean).join(" · ")}</div></div>
         <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(p)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === p.id) reset(); patch({ payments: o.payments.filter((x) => x.id !== p.id) }, "Pagamento excluído."); }} />` : null}</span></div>`;
     })}</div>`}
@@ -1000,9 +1044,10 @@ function Payments({ ctx, o, tt, patch }) {
       <datalist id="dl-met">${D.methods.map((m) => html`<option key=${m.id} value=${m.name} />`)}</datalist>
       <div class="grid g2">
         <${Field} label="Data"><input type="date" value=${date} onChange=${(e) => { setDate(e.target.value); const rr = rateFor(D.rates, e.target.value); if (rr) setRate(toInput(rr.usdBrl)); }} /><//>
-        <${Field} label="Valor pago" hint=${brlHint(amount, currency, parseDec(rate))}><span class="money" data-sym=${SYM(currency)}><input inputmode="decimal" value=${amount} placeholder=${tt.pending > 0 ? toInput(tt.pending) : ""} onInput=${(e) => setAmount(e.target.value)} /></span><//>
-        <${Field} label="Moeda"><select value=${currency} onChange=${(e) => setCurrency(e.target.value)}><option value="BRL">R$</option><option value="USD">$</option></select><//>
-        <${Field} label="Cotação ($1 =)"><span class="money" data-sym="R$"><input inputmode="decimal" value=${rate} onInput=${(e) => setRate(e.target.value)} /></span><//>
+        <${Field} label="Valor pago"><span class="money" data-sym=${SYM(currency)}><input id="pay-amount" inputmode="decimal" value=${amount} placeholder=${tt.pending > 0 ? toInput(tt.pending) : ""} onInput=${(e) => setAmount(e.target.value)} /></span><//>
+        <${Field} label="Moeda"><select id="pay-cur" value=${currency} onChange=${(e) => { setCurrency(e.target.value); cv.clear(); }}><option value="BRL">R$</option><option value="USD">$</option></select><//>
+        <${Field} label="Cotação ($1 =)"><span class="money" data-sym="R$"><input id="pay-rate" inputmode="decimal" value=${rate} onInput=${(e) => setRate(e.target.value)} /></span><//>
+        ${convTarget ? convField(cv, amount, currency, convTarget, rate, "pay-conv") : null}
         <${Field} label="Forma de pagamento"><input list="dl-met" value=${method} onInput=${(e) => setMethod(e.target.value)} placeholder="PIX, Wise..." /><//>
         <${Field} label="Observação"><input value=${notes} onInput=${(e) => setNotes(e.target.value)} /><//>
       </div>
@@ -1033,29 +1078,32 @@ function Taxes({ ctx, o, tt, patch }) {
   const diff = tt.taxForecastBRL > 0 && tt.taxPaidBRL > 0 ? (tt.taxPaidBRL - tt.taxForecastBRL) / tt.taxForecastBRL * 100 : null;
   const [editId, setEditId] = useState(null);
   const formRef = useRef(null);
+  const cv = useConv();
   function reset() {
-    setEditId(null); setDate(t); setAmount(""); setCurrency("BRL"); setRate(toInput(rateFor(D.rates, t)?.usdBrl)); setTrk(""); setNotes(""); setErr(null);
+    setEditId(null); setDate(t); setAmount(""); setCurrency("BRL"); setRate(toInput(rateFor(D.rates, t)?.usdBrl)); setTrk(""); setNotes(""); setErr(null); cv.clear();
   }
   function startEdit(x) {
     setEditId(x.id); setDate(x.date || ""); setAmount(toInput(x.amount)); setCurrency(x.currency || "BRL");
     setRate(toInput(x.rate ?? rateFor(D.rates, x.date || t)?.usdBrl)); setTrk(x.trackingId || ""); setNotes(x.notes || ""); setErr(null); setOpen(true);
+    if ((x.currency || "BRL") === "USD") convLoad(cv, x, "BRL"); else cv.clear();
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
   }
   async function add() {
     setErr(null);
     const a = parseDec(amount), r = parseDec(rate);
     if (!a || a <= 0) return setErr("Informe o valor do imposto pago.");
-    if (currency === "USD" && !r) return setErr("Informe a cotação para converter em reais.");
+    const conv = currency === "USD" ? convResult(a, "USD", "BRL", r, cv) : null;
+    if (currency === "USD" && !conv) return setErr("Informe a cotação ou o valor em reais.");
     setBusy(true);
     try {
-      const tax = { id: editId || uid(), date, amount: a, currency, rate: currency === "USD" ? r : null, trackingId: trk || null, notes: notes.trim() || null };
+      const tax = { id: editId || uid(), date, amount: a, currency, rate: conv ? conv.rate : null, brlAmount: conv ? r2(conv.brlAmount) : null, trackingId: trk || null, notes: notes.trim() || null };
       if (editId) {
         if (!(o.taxPayments || []).some((x) => x.id === editId)) { reset(); setBusy(false); return setErr("Este lançamento foi excluído por outra pessoa."); }
         await api.patchOrder(o.id, { taxPayments: o.taxPayments.map((x) => (x.id === editId ? { ...x, ...tax } : x)) });
         reset(); notify("Lançamento de imposto alterado.");
       } else {
         await api.patchOrder(o.id, { taxMode: o.taxMode === "sem" ? "por_fora" : o.taxMode, taxPayments: [...(o.taxPayments || []), tax] });
-        setAmount(""); setNotes(""); notify("Imposto lançado.");
+        setAmount(""); setNotes(""); cv.clear(); notify("Imposto lançado.");
       }
     } catch (e) { console.error(e); setErr(editId ? "Não foi possível salvar a alteração. Tente de novo." : "Não foi possível lançar. Tente de novo."); }
     setBusy(false);
@@ -1076,16 +1124,17 @@ function Taxes({ ctx, o, tt, patch }) {
     </div>` : null}
     ${tt.taxAwaiting ? html`<div class="banner b-warn">Imposto por fora ainda não lançado. Quando pagar, lance abaixo.</div>` : null}
     ${o.taxMode !== "incluso" ? html`
-      ${list.length ? html`<div class="list">${list.map((x) => html`<div class="li" key=${x.id} style=${editId === x.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(x.date)} · ${M(x.amount, x.currency, x.rate || tt.orate)}</strong>
+      ${list.length ? html`<div class="list">${list.map((x) => html`<div class="li" key=${x.id} style=${editId === x.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(x.date)} · ${x.currency === "USD" && x.brlAmount != null ? html`${money(x.brlAmount)}<span class="brl">${money(x.amount, "USD")}</span>` : M(x.amount, x.currency, x.rate || tt.orate)}</strong>
         <div class="small muted">${[(o.trackings || []).find((k) => k.id === x.trackingId) ? "Pacote " + o.trackings.find((k) => k.id === x.trackingId).code : "Pedido todo", x.rate ? "cotação " + money(x.rate) : null, x.notes].filter(Boolean).join(" · ")}</div></div>
         <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(x)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === x.id) reset(); patch({ taxPayments: list.filter((y) => y.id !== x.id) }, "Lançamento excluído."); }} />` : null}</span></div>`)}
         <div class="li"><strong>Total de imposto pago</strong><strong class="tab">${money(tt.taxPaidBRL)}</strong></div></div>` : null}
       ${canWrite ? html`<details ref=${formRef} open=${open} onToggle=${(e) => setOpen(e.target.open)} style=${"background:var(--surface-2);border-radius:8px;padding:12px" + (editId ? ";outline:2px solid var(--accent)" : "")}><summary>${editId ? "Editar imposto pago" : "Lançar imposto pago"}</summary>
         <div class="grid g2" style="margin-top:10px">
           <${Field} label="Data do pagamento"><input type="date" value=${date} onChange=${(e) => { setDate(e.target.value); const rr = rateFor(D.rates, e.target.value); if (rr) setRate(toInput(rr.usdBrl)); }} /><//>
-          <${Field} label="Valor pago" hint=${brlHint(amount, currency, parseDec(rate))}><span class="money" data-sym=${SYM(currency)}><input inputmode="decimal" value=${amount} onInput=${(e) => setAmount(e.target.value)} /></span><//>
-          <${Field} label="Moeda"><select value=${currency} onChange=${(e) => setCurrency(e.target.value)}><option value="BRL">R$</option><option value="USD">$</option></select><//>
-          ${currency === "USD" ? html`<${Field} label="Cotação ($1 =)"><span class="money" data-sym="R$"><input inputmode="decimal" value=${rate} onInput=${(e) => setRate(e.target.value)} /></span><//>` : null}
+          <${Field} label="Valor pago"><span class="money" data-sym=${SYM(currency)}><input id="tax-amount" inputmode="decimal" value=${amount} onInput=${(e) => setAmount(e.target.value)} /></span><//>
+          <${Field} label="Moeda"><select id="tax-cur" value=${currency} onChange=${(e) => { setCurrency(e.target.value); cv.clear(); }}><option value="BRL">R$</option><option value="USD">$</option></select><//>
+          ${currency === "USD" ? html`<${Field} label="Cotação ($1 =)"><span class="money" data-sym="R$"><input id="tax-rate" inputmode="decimal" value=${rate} onInput=${(e) => setRate(e.target.value)} /></span><//>
+          ${convField(cv, amount, "USD", "BRL", rate, "tax-conv")}` : null}
           <${Field} label="Referente a"><select value=${trk} onChange=${(e) => setTrk(e.target.value)}><option value="">Pedido todo</option>${(o.trackings || []).map((k) => html`<option key=${k.id} value=${k.id}>Pacote ${k.code}${k.label ? " (" + k.label + ")" : ""}</option>`)}</select><//>
           <${Field} label="Observação"><input value=${notes} onInput=${(e) => setNotes(e.target.value)} /><//>
         </div>
