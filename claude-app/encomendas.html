@@ -58,7 +58,7 @@ nav.desk button { background: none; border: 0; padding: 7px 12px; border-radius:
 nav.desk button.on { background: var(--accent-soft); color: var(--accent); }
 .rate-chip { margin-left: auto; border: 0; border-radius: 999px; padding: 5px 11px; font: 500 .85rem var(--font-body); cursor: pointer; background: var(--surface-2); color: var(--fg); }
 .rate-chip.stale { background: var(--warn-soft); color: var(--warn); }
-nav.mob { position: fixed; inset: auto 0 0 0; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+nav.mob { position: fixed; inset: auto 0 0 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
 nav.mob button { background: none; border: 0; padding: 9px 2px 8px; font: 500 .72rem var(--font-body); color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
 nav.mob button.on { color: var(--accent); }
 nav.mob svg { width: 21px; height: 21px; }
@@ -456,7 +456,8 @@ const ICONS = {
   dolar: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M16.5 7.5c-.8-1.2-2.4-2-4.5-2-2.6 0-4.3 1.3-4.3 3.1 0 4.4 9 2.4 9 6.9 0 1.9-1.9 3.2-4.7 3.2-2.3 0-4-.9-4.8-2.2"/></svg>`,
   cadastros: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>`,
 };
-const NAV = [["painel", "Painel"], ["pedidos", "Pedidos"], ["novo", "Novo"], ["dolar", "Dólar"], ["cadastros", "Cadastros"]];
+// "Novo" e "Dólar" continuam existindo, só não aparecem no menu (acesso pelo botão "+ Novo pedido" e pela cotação no topo)
+const NAV = [["painel", "Painel"], ["pedidos", "Pedidos"], ["cadastros", "Cadastros"]];
 
 // ---------------- App ----------------
 function App() {
@@ -481,7 +482,7 @@ function App() {
   if (st.noDb) return html`<main class="page"><div class="card"><div class="cb"><h1>Encomendas China</h1><p>Para ver e salvar os pedidos, abra este app pelo claude.ai (navegador ou app do Claude) com a sua conta.</p></div></div></main>`;
 
   const ctx = { st, api, D, byId, go, notify, filters, setFilters, today: t, curRate: cur, canWrite: st.canWrite, isAdmin: st.isAdmin };
-  const active = view.name === "pedido" || view.name === "conferencia" || view.name === "editar" ? "pedidos" : view.name;
+  const active = ["pedido", "conferencia", "editar", "novo"].includes(view.name) ? "pedidos" : view.name;
   let page;
   if (view.name === "painel") page = html`<${Painel} ctx=${ctx} />`;
   else if (view.name === "pedidos") page = html`<${Pedidos} ctx=${ctx} />`;
