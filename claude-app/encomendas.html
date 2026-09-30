@@ -245,7 +245,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 
 function totals(o) {
   const cur = o.currency || "BRL";
-  const orate = o.rate > 0 ? o.rate : FALLBACK_RATE;
+  let orate = o.rate > 0 ? o.rate : FALLBACK_RATE;
   let missingRate = false;
   const to = (amt, from, rate, target) => { const v = convert(amt, from, target, rate || orate); if (v === null) { missingRate = true; return 0; } return v; };
   // Pagamento/imposto: se o valor convertido foi digitado (ou salvo), usa ele em vez de recalcular pela cotação
@@ -255,6 +255,9 @@ function totals(o) {
   const itemsTotal = items.reduce((s, i) => s + n0(i.pieces) * n0(i.unitPrice), 0);
   const supplierExpenses = expenses.filter((e) => e.chargedBySupplier).reduce((s, e) => s + to(n0(e.amount), e.currency, null, cur), 0);
   const supplierTotal = r2(itemsTotal + n0(o.freight) - n0(o.discount) + supplierExpenses);
+  // Pedido em dólar com total em reais digitado à mão: vale a cotação efetiva (só se o total em dólar não mudou desde então)
+  const manualBRL = cur === "USD" && o.totalBRL > 0 && supplierTotal > 0 && Math.abs(n0(o.totalBRLFor) - supplierTotal) < 0.01;
+  if (manualBRL) orate = o.totalBRL / supplierTotal;
   const paid = r2(pays.reduce((s, p) => s + payTo(p, cur), 0));
   const pending = r2(supplierTotal - paid);
   let payStatus = "pendente";
@@ -275,7 +278,7 @@ function totals(o) {
   const pendingBRL = to(Math.max(pending, 0), cur, null, "BRL");
   const landedBRL = r2(paidBRL + pendingBRL + extrasBRL + taxForecastPendingBRL);
   return {
-    cur, orate, pieces, itemsTotal: r2(itemsTotal), freight: n0(o.freight), discount: n0(o.discount), supplierExpenses: r2(supplierExpenses),
+    cur, orate, manualBRL, pieces, itemsTotal: r2(itemsTotal), freight: n0(o.freight), discount: n0(o.discount), supplierExpenses: r2(supplierExpenses),
     supplierTotal, supplierTotalBRL: r2(to(supplierTotal, cur, null, "BRL")), paid, paidBRL: r2(paidBRL), pending, pendingBRL: r2(pendingBRL), payStatus, taxPaidBRL, taxAwaiting, taxForecastBRL, taxForecastPendingBRL, taxDone: !!o.taxDone, taxTotalBRL: r2(taxPaidBRL + taxIncludedBRL),
     extrasBRL, extrasPendingBRL, landedBRL, costPerPiece: pieces > 0 ? landedBRL / pieces : null, missingRate,
   };
@@ -303,9 +306,9 @@ function M(v, cur, rate, block) {
   return html`${money(b)}<span class=${cx("brl", block && "blk")}>${money(v, "USD")}</span>`;
 }
 // Campo de conversão (R$ <-> $): calculado pela cotação, mas pode ser digitado à mão
-function useConv() {
-  const [val, setVal] = useState("");
-  const [manual, setManual] = useState(false);
+function useConv(init) {
+  const [val, setVal] = useState(init != null ? toInput(init) : "");
+  const [manual, setManual] = useState(init != null);
   return { val, setVal, manual, setManual, clear() { setVal(""); setManual(false); } };
 }
 const convAuto = (amount, from, target, rate) => { const a = parseDec(amount), r = parseDec(rate); return a && r ? r2(convert(a, from, target, r)) : null; };
@@ -326,11 +329,11 @@ function convResult(a, from, target, r, cv) {
   const c = r2(convert(a, from, target, r));
   return { rate: r, brlAmount: target === "BRL" ? c : a, usdAmount: target === "USD" ? c : a };
 }
-function convField(cv, amount, from, target, rate, id) {
+function convField(cv, amount, from, target, rate, id, label) {
   const auto = convAuto(amount, from, target, rate);
   const a = parseDec(amount), m = parseDec(cv.val);
   const eff = cv.manual && a && m ? (target === "BRL" ? m / a : a / m) : null;
-  return html`<${Field} label=${target === "BRL" ? "Valor em reais" : "Equivale em dólar"} hint=${cv.manual
+  return html`<${Field} label=${label || (target === "BRL" ? "Valor em reais" : "Equivale em dólar")} hint=${cv.manual
       ? html`Digitado à mão${eff ? " · cotação efetiva " + money(eff) : ""} · <button type="button" class="link" onClick=${() => cv.clear()}>calcular pela cotação</button>`
       : "Calculado pela cotação. Pode editar se não bater."}>
     <span class="money" data-sym=${SYM(target)}><input id=${id} inputmode="decimal" value=${cv.manual ? cv.val : auto === null ? "" : toInput(auto)} placeholder="0,00"
@@ -751,6 +754,7 @@ function OrderForm({ ctx, id }) {
   })) : [emptyItem()]);
   const [expenses, setExpenses] = useState(() => (existing?.expenses || []).map((e) => ({ ...e, amount: toInput(e.amount) })));
   const [rateTouched, setRateTouched] = useState(!!existing?.rate);
+  const cvTotal = useConv(existing?.currency === "USD" && existing?.totalBRL > 0 ? existing.totalBRL : null);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
@@ -777,11 +781,14 @@ function OrderForm({ ctx, id }) {
     const m = D.modes.find((x) => key(x.name) === key(modeName));
     if (date && m?.defaultDays && !f.expectedDate) set("expectedDate", addDays(date, m.defaultDays));
   }
-  const tot = totals({
+  const totIn = {
     currency: cur, rate: parseDec(f.rate), freight: parseDec(f.freight), discount: parseDec(f.discount), taxMode: f.taxMode, taxAmount: parseDec(f.taxAmount), taxForecast: parseDec(f.taxForecast),
     items: items.map((i) => ({ pieces: parseDec(i.pieces) || 0, unitPrice: parseDec(i.unitPrice) || 0 })),
     expenses: expenses.map((e) => ({ amount: parseDec(e.amount) || 0, currency: e.currency, chargedBySupplier: e.chargedBySupplier, paid: e.paid })), payments: [], taxPayments: [],
-  });
+  };
+  const tot0 = totals(totIn);
+  const mTot = cur === "USD" && cvTotal.manual ? parseDec(cvTotal.val) : null;
+  const tot = mTot > 0 ? totals({ ...totIn, totalBRL: mTot, totalBRLFor: tot0.supplierTotal }) : tot0;
 
   async function save() {
     setErr(null);
@@ -804,6 +811,7 @@ function OrderForm({ ctx, id }) {
         number: existing ? existing.number : Math.max(0, ...D.orders.map((o) => o.number || 0)) + 1,
         title: norm(f.title), supplierId, orderDate: f.orderDate || null, expectedDate: f.expectedDate || null, modeId, carrierId,
         currency: cur, rate: rate || null, freight: parseDec(f.freight) || 0, discount: parseDec(f.discount) || 0,
+        ...(() => { const m = cur === "USD" && cvTotal.manual ? parseDec(cvTotal.val) : null; return m > 0 && tot.supplierTotal > 0 ? { totalBRL: r2(m), totalBRLFor: tot.supplierTotal } : { totalBRL: null, totalBRLFor: null }; })(),
         taxMode: f.taxMode, taxAmount: f.taxMode === "incluso" ? parseDec(f.taxAmount) || 0 : 0, taxForecast: f.taxMode === "por_fora" ? parseDec(f.taxForecast) || 0 : 0, status: f.status, notes: f.notes.trim() || null, needsReview: f.needsReview,
         items: items.map((i) => {
           let sizes = null;
@@ -874,6 +882,7 @@ function OrderForm({ ctx, id }) {
       <div class="grid g2">
         <${Field} label="Frete" hint=${brlHint(f.freight, cur, frate)}><span class="money" data-sym=${SYM(cur)}><input id="f-fr" inputmode="decimal" value=${f.freight} onInput=${(e) => set("freight", e.target.value)} /></span><//>
         <${Field} label="Desconto" hint=${brlHint(f.discount, cur, frate)}><span class="money" data-sym=${SYM(cur)}><input id="f-ds" inputmode="decimal" value=${f.discount} onInput=${(e) => set("discount", e.target.value)} /></span><//>
+        ${cur === "USD" ? convField(cvTotal, tot.supplierTotal > 0 ? String(tot.supplierTotal) : "", "USD", "BRL", f.rate, "f-total-brl", "Total do pedido em reais (" + money(tot.supplierTotal, "USD") + ")") : null}
       </div>
       <div class="radios">${Object.keys(TAX_LABEL).map((m) => html`<label key=${m} class=${cx("radio", f.taxMode === m && "on")}><input type="radio" name="taxMode" checked=${f.taxMode === m} onChange=${() => set("taxMode", m)} /><span><strong>${TAX_LABEL[m]}</strong><div class="small muted">${TAX_HINT[m]}</div></span></label>`)}</div>
       ${f.taxMode === "incluso" ? html`<${Field} label="Valor do imposto incluso — opcional" hint=${brlHint(f.taxAmount, cur, frate)}><span class="money" data-sym=${SYM(cur)}><input id="f-tx" inputmode="decimal" value=${f.taxAmount} onInput=${(e) => set("taxAmount", e.target.value)} /></span><//>` : null}
@@ -932,7 +941,7 @@ function OrderDetail({ ctx, id }) {
     <${Card} title="Resumo"><div class="grid g2">
       <${Info} l="Fornecedor" v=${byId.suppliers[o.supplierId]?.name} /><${Info} l="Data do pedido" v=${fdate(o.orderDate)} /><${Info} l="Previsão" v=${fdate(o.expectedDate)} bad=${late} />
       <${Info} l="Modalidade" v=${byId.modes[o.modeId]?.name} /><${Info} l="Transportadora" v=${byId.carriers[o.carrierId]?.name} /><${Info} l="Moeda" v=${cur === "USD" ? "Dólar ($)" : "Real (R$)"} />
-      <${Info} l="Cotação do pedido" v=${tt.orate ? money(tt.orate) : "—"} /><${Info} l="Total de peças" v=${num(tt.pieces, 0)} />
+      <${Info} l="Cotação do pedido" v=${tt.orate ? money(tt.orate) + (tt.manualBRL ? " (efetiva, total em reais digitado)" : "") : "—"} /><${Info} l="Total de peças" v=${num(tt.pieces, 0)} />
     </div>
     ${canWrite ? html`<div class="row"><${Field} label="Status do pedido"><select value=${o.status} onChange=${(e) => patch({ status: e.target.value }, "Status atualizado.")}>${Object.entries(ORDER_STATUS).map(([k, l]) => html`<option key=${k} value=${k}>${l}</option>`)}</select><//></div>` : null}
     ${o.notes ? html`<div class="banner" style="background:var(--surface-2);white-space:pre-wrap">${o.notes}</div>` : null}<//>
