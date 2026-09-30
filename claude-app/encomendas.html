@@ -935,6 +935,16 @@ function Payments({ ctx, o, tt, patch }) {
   const [notes, setNotes] = useState("");
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const formRef = useRef(null);
+  function reset() {
+    setEditId(null); setDate(t); setAmount(""); setCurrency(o.currency); setRate(toInput(rateFor(D.rates, t)?.usdBrl ?? o.rate)); setMethod(""); setNotes(""); setErr(null);
+  }
+  function startEdit(p) {
+    setEditId(p.id); setDate(p.date || ""); setAmount(toInput(p.amount)); setCurrency(p.currency || o.currency);
+    setRate(toInput(p.rate ?? rateFor(D.rates, p.date || t)?.usdBrl ?? o.rate)); setMethod(byId.methods[p.methodId]?.name || ""); setNotes(p.notes || ""); setErr(null);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  }
   async function add() {
     setErr(null);
     const a = parseDec(amount), r = parseDec(rate);
@@ -944,21 +954,28 @@ function Payments({ ctx, o, tt, patch }) {
     setBusy(true);
     try {
       const methodId = await resolveName(api, D.methods, "methods", method);
-      await api.patchOrder(o.id, { payments: [...(o.payments || []), { id: uid(), date, amount: a, currency, rate: r || null, methodId, notes: notes.trim() || null }] });
-      setAmount(""); setNotes(""); notify("Pagamento lançado.");
-    } catch (e) { console.error(e); setErr("Não foi possível lançar. Tente de novo."); }
+      const pay = { id: editId || uid(), date, amount: a, currency, rate: r || null, methodId, notes: notes.trim() || null };
+      if (editId) {
+        if (!(o.payments || []).some((x) => x.id === editId)) { reset(); return setErr("Este pagamento foi excluído por outra pessoa."); }
+        await api.patchOrder(o.id, { payments: o.payments.map((x) => (x.id === editId ? { ...x, ...pay } : x)) });
+        reset(); notify("Pagamento alterado.");
+      } else {
+        await api.patchOrder(o.id, { payments: [...(o.payments || []), pay] });
+        setAmount(""); setNotes(""); notify("Pagamento lançado.");
+      }
+    } catch (e) { console.error(e); setErr(editId ? "Não foi possível salvar a alteração. Tente de novo." : "Não foi possível lançar. Tente de novo."); }
     setBusy(false);
   }
   const pays = [...(o.payments || [])].sort((a, b) => (a.date < b.date ? -1 : 1));
   return html`<${Card} title=${"Pagamentos ao fornecedor (" + pays.length + ")"}>
     ${pays.length === 0 ? html`<div class="empty">Nenhum pagamento lançado.</div>` : html`<div class="list">${pays.map((p) => {
       const inOrder = convert(p.amount, p.currency, o.currency, p.rate || tt.orate);
-      return html`<div class="li" key=${p.id}><div><strong class="tab">${fdate(p.date)} · ${money(p.amount, p.currency)}</strong>${p.currency !== o.currency && inOrder !== null ? html` <span class="muted">(${money(inOrder, o.currency)})</span>` : null}
+      return html`<div class="li" key=${p.id} style=${editId === p.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(p.date)} · ${money(p.amount, p.currency)}</strong>${p.currency !== o.currency && inOrder !== null ? html` <span class="muted">(${money(inOrder, o.currency)})</span>` : null}
         <div class="small muted">${[byId.methods[p.methodId]?.name, p.rate ? "cotação " + money(p.rate) : null, p.notes].filter(Boolean).join(" · ")}</div></div>
-        ${isAdmin ? html`<${Confirm} small onConfirm=${() => patch({ payments: o.payments.filter((x) => x.id !== p.id) }, "Pagamento excluído.")} />` : null}</div>`;
+        <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(p)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === p.id) reset(); patch({ payments: o.payments.filter((x) => x.id !== p.id) }, "Pagamento excluído."); }} />` : null}</span></div>`;
     })}</div>`}
-    ${canWrite ? html`<div style="background:var(--surface-2);border-radius:8px;padding:12px;display:grid;gap:10px">
-      <strong>Lançar pagamento</strong>
+    ${canWrite ? html`<div ref=${formRef} style=${"background:var(--surface-2);border-radius:8px;padding:12px;display:grid;gap:10px" + (editId ? ";outline:2px solid var(--accent)" : "")}>
+      <strong>${editId ? "Editar pagamento" : "Lançar pagamento"}</strong>
       <datalist id="dl-met">${D.methods.map((m) => html`<option key=${m.id} value=${m.name} />`)}</datalist>
       <div class="grid g2">
         <${Field} label="Data"><input type="date" value=${date} onChange=${(e) => { setDate(e.target.value); const rr = rateFor(D.rates, e.target.value); if (rr) setRate(toInput(rr.usdBrl)); }} /><//>
@@ -969,7 +986,7 @@ function Payments({ ctx, o, tt, patch }) {
         <${Field} label="Observação"><input value=${notes} onInput=${(e) => setNotes(e.target.value)} /><//>
       </div>
       ${err ? html`<div class="err">${err}</div>` : null}
-      <div><button class="btn pri" disabled=${busy} onClick=${add}>${busy ? "Lançando…" : "Lançar pagamento"}</button></div></div>` : null}
+      <div class="row"><button class="btn pri" id="pay-save" disabled=${busy} onClick=${add}>${busy ? "Salvando…" : editId ? "Salvar alteração" : "Lançar pagamento"}</button>${editId ? html`<button class="btn" onClick=${reset}>Cancelar</button>` : null}</div></div>` : null}
   <//>`;
 }
 
