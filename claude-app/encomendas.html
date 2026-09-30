@@ -161,6 +161,15 @@ div.f { display: grid; gap: 4px; }
 .linkish { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; min-width: 0; }
 .price-li { align-items: center; gap: 12px; }
 .price-v { text-align: right; flex-shrink: 0; margin-left: auto; }
+.price-item { padding: 12px 0; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.price-item:last-child { border-bottom: 0; }
+.costbox { background: var(--surface-2); border-radius: 8px; padding: 8px 12px; display: grid; gap: 2px; max-width: 420px; }
+.cb-line { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; padding: 2px 0; }
+.cb-line > span:first-child { color: var(--muted); }
+.cb-total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 6px; font-weight: 700; font-size: 1rem; }
+.cb-total > span:first-child { color: var(--fg); }
+.cb-total > span:last-child { color: var(--accent); font-family: var(--font-display); }
+.cb-sale > span:last-child { font-weight: 600; }
 .price-v .big { font-family: var(--font-display); font-size: 1.25rem; color: var(--accent); }
 .bars { display: grid; gap: 10px; }
 .bar-row.click { cursor: pointer; }
@@ -303,7 +312,7 @@ function totals(o) {
   const landedBRL = r2(paidBRL + pendingBRL + extrasBRL + taxForecastPendingBRL);
   return {
     cur, orate, manualBRL, pieces, itemsTotal: r2(itemsTotal), freight: n0(o.freight), discount: n0(o.discount), supplierExpenses: r2(supplierExpenses),
-    supplierTotal, supplierTotalBRL: r2(to(supplierTotal, cur, null, "BRL")), paid, paidBRL: r2(paidBRL), pending, pendingBRL: r2(pendingBRL), payStatus, taxPaidBRL, taxAwaiting, taxForecastBRL, taxForecastPendingBRL, taxDone: !!o.taxDone, taxTotalBRL: r2(taxPaidBRL + taxIncludedBRL),
+    supplierTotal, supplierTotalBRL: r2(to(supplierTotal, cur, null, "BRL")), paid, paidBRL: r2(paidBRL), pending, pendingBRL: r2(pendingBRL), payStatus, taxPaidBRL, taxAwaiting, taxForecastBRL, taxForecastPendingBRL, taxDone: !!o.taxDone, taxTotalBRL: r2(taxPaidBRL + taxIncludedBRL), taxIncludedBRL,
     extrasBRL, extrasPendingBRL, landedBRL, costPerPiece: pieces > 0 ? landedBRL / pieces : null, missingRate,
   };
 }
@@ -654,7 +663,7 @@ function Painel({ ctx }) {
       <${Card} title=${"Atrasados (" + late.length + ")"}><${OList} list=${late} empty="Nenhum pedido atrasado." right=${(x) => html`<span style="color:var(--bad)">Previsto ${fdate(x.o.expectedDate)}</span>`} /><//>
       <${Card} title=${"Chegando em 15 dias (" + arriving.length + ")"}><${OList} list=${arriving} empty="Nenhuma chegada prevista nos próximos 15 dias." right=${(x) => fdate(x.o.expectedDate)} /><//>
       <${Card} title="A pagar por fornecedor">${Object.values(bySup).length ? html`<div class="list">${Object.values(bySup).sort((a, b) => toBRL(b) - toBRL(a)).map((s) => html`
-        <div class="li" key=${s.id || "sem"} style="cursor:pointer" onClick=${() => toList({ fornecedor: s.id || "", pagamento: "em_aberto" })}><strong>${s.name}</strong><span class="tab" style="text-align:right"><div>${money(s.total)}</div>${s.USD > 0 ? html`<div class="small muted">inclui ${money(s.USD, "USD")}</div>` : null}</span></div>`)}</div>` : html`<div class="empty">Nenhum saldo a pagar.</div>`}<//>
+        <div class="li" key=${s.id || "sem"} style="cursor:pointer" onClick=${() => toList({ fornecedor: s.id || "", pagamento: "em_aberto" })}><strong>${s.name}</strong><span class="tab" style="text-align:right"><div>${money(s.total)}</div>${s.USD > 0 ? html`<div class="small muted">inclui ${money(s.USD, "USD")}</div>` : null}</span></div>`)}<div class="li" style="border-top:2px solid var(--line)"><strong>Total</strong><span class="tab" style="text-align:right"><div><strong>${money(toBRL(pend))}</strong></div>${pend.USD > 0 ? html`<div class="small muted">inclui ${money(pend.USD, "USD")}</div>` : null}</span></div></div>` : html`<div class="empty">Nenhum saldo a pagar.</div>`}<//>
       <${Card} title=${"Precisam de atenção (" + attention.length + ")"}><${OList} list=${attention} empty="Nada pendente." right=${(x) => html`<span class="row" style="justify-content:flex-end">${x.al.map(([tone, l]) => html`<${Pill} key=${l} tone=${tone}>${l}<//>`)}</span>`} /><//>
     </div>`;
 }
@@ -1528,15 +1537,48 @@ function costStatus(tt) {
   if (tt.missingRate) why.push("valor em dólar sem cotação");
   return { final: why.length === 0, why };
 }
+// Custo do pedido em R$ separado em partes. A parte do fornecedor (produtos, frete, desconto e despesas cobradas por ele)
+// usa o que foi pago de verdade + o saldo; imposto = pago por fora + previsto não concluído (ou o valor incluso informado).
+function costParts(tt) {
+  const supBRL = tt.paidBRL + (tt.pending > 0 ? tt.pendingBRL : 0);
+  const eff = tt.supplierTotal > 0 ? supBRL / tt.supplierTotal : tt.cur === "USD" ? tt.orate || 0 : 1;
+  const incl = tt.taxIncludedBRL || 0;
+  return {
+    eff,
+    produto: tt.itemsTotal * eff - incl,
+    frete: tt.freight * eff,
+    desconto: tt.discount * eff,
+    imposto: tt.taxPaidBRL + tt.taxForecastPendingBRL + incl,
+    outras: tt.extrasBRL - tt.taxPaidBRL + tt.supplierExpenses * eff,
+  };
+}
+// Por peça de cada item: o produto é o preço do próprio item; frete, desconto, imposto e outras despesas
+// são rateados pelo valor de cada item no pedido.
 function itemCosts(o, tt) {
-  const factor = tt.itemsTotal > 0 ? tt.landedBRL / tt.itemsTotal : null;
+  const P = costParts(tt);
   return (o.items || []).map((i) => {
-    const pieces = n0(i.pieces);
-    const cost = factor === null || !(n0(i.unitPrice) > 0) ? null : n0(i.unitPrice) * factor;
+    const pieces = n0(i.pieces), up = n0(i.unitPrice);
+    if (!(up > 0) || !(tt.itemsTotal > 0)) return { i, pieces, cost: null, costGood: null, good: null, parts: null };
+    const w = up / tt.itemsTotal;
+    const parts = { produto: up * P.eff - (tt.taxIncludedBRL || 0) * w, frete: P.frete * w, desconto: P.desconto * w, imposto: P.imposto * w, outras: P.outras * w };
+    const cost = parts.produto + parts.frete - parts.desconto + parts.imposto + parts.outras;
     const good = i.receivedQty != null ? Math.max(n0(i.receivedQty) - n0(i.defectiveQty), 0) : null;
-    const costGood = cost !== null && good !== null && good > 0 && good < pieces ? (cost * pieces) / good : null;
-    return { i, pieces, cost, costGood, good };
+    const costGood = good !== null && good > 0 && good < pieces ? (cost * pieces) / good : null;
+    return { i, pieces, cost, costGood, good, parts };
   });
+}
+// Quadro "conta da peça": produto + frete + imposto + outras despesas = custo por peça
+function CostBreak({ parts, cost, sale, cfg, usd, label = "Custo por peça" }) {
+  const line = (l, v, cls) => html`<div class=${cx("cb-line", cls)}><span>${l}</span><span class="tab">${v}</span></div>`;
+  return html`<div class="costbox">
+    ${line("Produto", html`${money(parts.produto)}${usd ? html`<span class="brl">${usd}</span>` : null}`)}
+    ${line("Frete", money(parts.frete))}
+    ${parts.desconto > 0.004 ? line("Desconto", "− " + money(parts.desconto)) : null}
+    ${line("Imposto", money(parts.imposto))}
+    ${line("Outras despesas", money(parts.outras))}
+    ${line(label, money(cost), "cb-total")}
+    ${line("Venda sugerida (+" + num(cfg.markup, 0) + "%" + (cfg.round90 ? " · final ,90" : "") + ")", money(sale), "cb-sale")}
+  </div>`;
 }
 function salePrice(cost, markup, round90) {
   if (cost === null || cost === undefined) return null;
@@ -1580,59 +1622,62 @@ function Precos({ ctx }) {
     return { o, tt, r, st: costStatus(tt), costs: itemCosts(o, tt), arrived: hasArrived(o, r), arr: arrivalDate(o), sup: byId.suppliers[o.supplierId]?.name || "" };
   }).filter((x) => scope === "todos" || x.arrived);
   const itemText = (c) => key((byId.products[c.i.productId]?.name || "") + " " + (c.i.variant || ""));
-  const price = (c) => salePrice(c.cost, cfg.markup, cfg.round90);
+  const sale = (cost) => salePrice(cost, cfg.markup, cfg.round90);
   const pname = (i) => byId.products[i.productId]?.name || "—";
+  const Name = ({ i, extra }) => html`<div><strong>${pname(i)}</strong>${i.variant ? html` <span class="muted">· ${i.variant}</span>` : null}${extra ? html`<div class="small muted">${extra}</div>` : null}</div>`;
 
   let body;
   if (mode === "pedido") {
     const list = rows.map((x) => {
       const orderHit = !k || key(x.o.title + " " + x.sup + " #" + x.o.number + " " + x.o.number).includes(k);
-      const items = orderHit ? x.costs : x.costs.filter((c) => itemText(c).includes(k));
-      return { ...x, items };
+      return { ...x, items: orderHit ? x.costs : x.costs.filter((c) => itemText(c).includes(k)) };
     }).filter((x) => x.items.length).sort((a, b) => (b.arr || b.o.orderDate || "").localeCompare(a.arr || a.o.orderDate || "") || (b.o.number || 0) - (a.o.number || 0));
     body = list.length ? list.map((x) => html`<section class="card" key=${x.o.id}>
       <div class="ch"><button class="linkish" onClick=${() => go("pedido", { id: x.o.id })}><h2><span class="num">#${x.o.number}</span> ${x.o.title}</h2></button>
         <${Pill} tone=${x.st.final ? "p-good" : "p-warn"}>${x.st.final ? "Custo final" : "Custo estimado"}<//></div>
       <div class="cb">
-        <div class="small muted">${[x.sup, x.arr ? "chegou " + fdate(x.arr) : x.arrived ? "chegou" : "ainda não chegou", x.tt.itemsTotal > 0 ? "cada " + (x.tt.cur === "USD" ? "$ 1" : "R$ 1") + " de produto custou " + money(x.tt.landedBRL / x.tt.itemsTotal) + " no final" : null].filter(Boolean).join(" · ")}</div>
+        <div class="small muted">${[x.sup, x.arr ? "chegou " + fdate(x.arr) : x.arrived ? "chegou" : "ainda não chegou"].filter(Boolean).join(" · ")}</div>
         ${!x.st.final ? html`<div class="small" style="color:var(--warn)">Pode mudar: ${x.st.why.join(", ")}.</div>` : null}
-        <div class="list">${x.items.map((c) => html`<div class="li price-li" key=${c.i.id}>
-          <div style="min-width:0"><strong>${pname(c.i)}</strong>${c.i.variant ? html` <span class="muted">· ${c.i.variant}</span>` : null}
-            <div class="small muted">${num(c.pieces, 0)} peças · produto ${M(c.i.unitPrice, x.tt.cur, x.tt.orate)}</div>
-            ${c.costGood !== null ? html`<div class="small" style="color:var(--warn)">Chegaram ${num(c.good, 0)} boas de ${num(c.pieces, 0)}: por peça boa ${money(c.costGood)}</div>` : null}</div>
-          <div class="price-v"><div class="small muted">Custo/peça</div><strong class="tab big">${c.cost === null ? "—" : money(c.cost)}</strong>
-            <div class="small tab">Venda sugerida <strong>${c.cost === null ? "—" : money(price(c))}</strong></div></div>
+        <div>${x.items.map((c) => html`<div class="price-item" key=${c.i.id}>
+          <${Name} i=${c.i} extra=${num(c.pieces, 0) + " peças"} />
+          ${c.parts ? html`<${CostBreak} parts=${c.parts} cost=${c.cost} sale=${sale(c.cost)} cfg=${cfg} usd=${x.tt.cur === "USD" ? money(c.i.unitPrice, "USD") : null} />` : html`<div class="small muted">Sem valor unitário neste item.</div>`}
+          ${c.costGood !== null ? html`<div class="small" style="color:var(--warn)">Chegaram ${num(c.good, 0)} peças boas de ${num(c.pieces, 0)}: custo por peça boa ${money(c.costGood)}</div>` : null}
         </div>`)}</div>
-      </div></section>`) : html`<div class="card"><div class="empty">${k ? "Nada encontrado com essa busca." : scope === "chegaram" ? "Nenhum pedido chegou ainda. Veja “Todos os pedidos”." : "Nenhum pedido."}</div></div>`;
+      </div></section>`) : html`<div class="card"><div class="empty">${k ? "Nada encontrado com essa busca." : scope === "chegaram" ? "Nenhum pedido chegou ainda. Toque em “Todos”." : "Nenhum pedido."}</div></div>`;
   } else {
-    // Por produto: custo do pedido mais recente e custo médio (ponderado pelas peças)
+    // Por modelo: média de cada parte, ponderada pelas peças de todos os pedidos do modelo
     const g = {};
     for (const x of rows) for (const c of x.costs) {
-      if (c.cost === null) continue;
+      if (!c.parts || !(c.pieces > 0)) continue;
       const gk = c.i.productId + "|" + key(c.i.variant || "");
-      const e = (g[gk] = g[gk] || { gk, name: pname(c.i), variant: c.i.variant || "", n: 0, pcs: 0, sum: 0, min: Infinity, max: 0, last: null });
-      e.n++; e.pcs += c.pieces; e.sum += c.cost * c.pieces; e.min = Math.min(e.min, c.cost); e.max = Math.max(e.max, c.cost);
+      const e = (g[gk] = g[gk] || { gk, i: c.i, n: 0, pcs: 0, produto: 0, frete: 0, desconto: 0, imposto: 0, outras: 0, total: 0, min: Infinity, max: 0, last: null, allFinal: true });
+      e.n++; e.pcs += c.pieces;
+      for (const f of ["produto", "frete", "desconto", "imposto", "outras"]) e[f] += c.parts[f] * c.pieces;
+      e.total += c.cost * c.pieces; e.min = Math.min(e.min, c.cost); e.max = Math.max(e.max, c.cost);
+      if (!x.st.final) e.allFinal = false;
       const d = x.arr || x.o.orderDate || "";
-      if (!e.last || d > e.last.d || (d === e.last.d && x.o.number > e.last.o.number)) e.last = { d, o: x.o, cost: c.cost, final: x.st.final };
+      if (!e.last || d > e.last.d || (d === e.last.d && x.o.number > e.last.o.number)) e.last = { d, o: x.o, cost: c.cost };
     }
-    const list = Object.values(g).filter((e) => !k || key(e.name + " " + e.variant).includes(k)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.variant.localeCompare(b.variant, "pt-BR"));
-    body = list.length ? html`<div class="card"><div class="cb"><div class="list">${list.map((e) => html`<div class="li price-li" key=${e.gk}>
-      <div style="min-width:0"><strong>${e.name}</strong>${e.variant ? html` <span class="muted">· ${e.variant}</span>` : null}
-        <div class="small muted">${e.n} pedido(s) · ${num(e.pcs, 0)} peças${e.n > 1 ? " · média " + money(e.sum / e.pcs) + " · de " + money(e.min) + " a " + money(e.max) : ""}</div>
-        <div class="small muted">Último: <button class="link" onClick=${() => go("pedido", { id: e.last.o.id })}>#${e.last.o.number}</button>${e.last.d ? " (" + fdate(e.last.d) + ")" : ""}${e.last.final ? "" : " · estimado"}</div></div>
-      <div class="price-v"><div class="small muted">Último custo</div><strong class="tab big">${money(e.last.cost)}</strong>
-        <div class="small tab">Venda sugerida <strong>${money(salePrice(e.last.cost, cfg.markup, cfg.round90))}</strong></div></div></div>`)}</div></div></div>`
+    const list = Object.values(g).filter((e) => !k || key(pname(e.i) + " " + (e.i.variant || "")).includes(k)).sort((a, b) => pname(a.i).localeCompare(pname(b.i), "pt-BR") || (a.i.variant || "").localeCompare(b.i.variant || "", "pt-BR"));
+    body = list.length ? html`<div class="card"><div class="cb">${list.map((e) => {
+      const avg = { produto: e.produto / e.pcs, frete: e.frete / e.pcs, desconto: e.desconto / e.pcs, imposto: e.imposto / e.pcs, outras: e.outras / e.pcs };
+      const t = e.total / e.pcs;
+      return html`<div class="price-item" key=${e.gk}>
+        <${Name} i=${e.i} extra=${e.n + " pedido(s) · " + num(e.pcs, 0) + " peças" + (e.allFinal ? "" : " · inclui custo estimado")} />
+        <${CostBreak} parts=${avg} cost=${t} sale=${sale(t)} cfg=${cfg} label=${e.n > 1 ? "Custo médio por peça" : "Custo por peça"} />
+        <div class="small muted">${e.n > 1 ? "Variou de " + money(e.min) + " a " + money(e.max) + " · " : ""}Último pedido: <button class="link" onClick=${() => go("pedido", { id: e.last.o.id })}>#${e.last.o.number}</button> ${money(e.last.cost)}${e.last.d ? " (" + fdate(e.last.d) + ")" : ""}</div>
+      </div>`; })}</div></div>`
       : html`<div class="card"><div class="empty">Nada encontrado.</div></div>`;
   }
 
   return html`<${Head} title="Preços" />
-    <${Card} title="Custo real por peça">
-      <p class="small muted" style="margin:0">Custo de cada modelo já com frete, imposto, despesas e o dólar que você realmente pagou. Use para precificar quando a mercadoria chegar.</p>
+    <${Card} title="Quanto custou cada peça">
+      <p class="small muted" style="margin:0">Cada peça = <strong>produto</strong> (pelo dólar que você realmente pagou) + <strong>frete</strong> + <strong>imposto</strong> + <strong>outras despesas</strong>. Frete, imposto e despesas do pedido são divididos entre os itens pelo valor de cada um.</p>
       <${MarkupBox} ctx=${ctx} />
       <input id="pq" placeholder="Buscar modelo, fornecedor ou nº do pedido" value=${q} onInput=${(e) => setQ(e.target.value)} />
       <div class="row">
         <div class="seg">${[["chegaram", "Já chegaram"], ["todos", "Todos"]].map(([v, l]) => html`<button key=${v} class=${scope === v ? "on" : ""} onClick=${() => setScope(v)}>${l}</button>`)}</div>
-        <div class="seg">${[["pedido", "Por pedido"], ["produto", "Por modelo"]].map(([v, l]) => html`<button key=${v} class=${mode === v ? "on" : ""} onClick=${() => setMode(v)}>${l}</button>`)}</div>
+        <div class="seg">${[["pedido", "Por pedido"], ["produto", "Média por modelo"]].map(([v, l]) => html`<button key=${v} class=${mode === v ? "on" : ""} onClick=${() => setMode(v)}>${l}</button>`)}</div>
       </div>
     <//>
     ${body}`;
