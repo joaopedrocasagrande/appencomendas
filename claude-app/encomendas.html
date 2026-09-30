@@ -136,12 +136,14 @@ td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .radio.on { border-color: var(--accent); background: var(--accent-soft); }
 .toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 50; background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-weight: 500; font-size: .9rem; }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-.sortbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.sortbar button { flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 6px 12px; font: 500 .82rem var(--font-body); cursor: pointer; white-space: nowrap; }
-.sortbar button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
-.sortbar button.inv { border-style: dashed; color: var(--muted); }
-.sortbar button.inv.on { border-style: solid; color: var(--accent-fg); }
-.sortbar .small { flex: 0 0 auto; }
+.sortmenu { position: relative; justify-self: start; }
+.sort-btn { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 7px 14px; font: 500 .88rem var(--font-body); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.sort-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; min-width: 240px; max-width: calc(100vw - 32px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 30px rgb(0 0 0 / .16); padding: 4px; display: grid; }
+.sort-pop button { background: none; border: 0; text-align: left; padding: 9px 10px; border-radius: 8px; font: 400 .92rem var(--font-body); color: var(--fg); cursor: pointer; display: flex; gap: 8px; align-items: center; }
+.sort-pop button:hover { background: var(--surface-2); }
+.sort-pop button.on { color: var(--accent); font-weight: 600; }
+.sort-pop .chk-mark { width: 14px; display: inline-block; color: var(--accent); }
+.sort-pop .sep { height: 1px; background: var(--line); margin: 4px 6px; }
 .tabs button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font: 500 .85rem var(--font-body); cursor: pointer; color: var(--fg); }
 .tabs button.on { background: var(--navy); color: var(--surface); border-color: var(--navy); }
 .err { color: var(--bad); font-size: .85rem; }
@@ -545,6 +547,30 @@ function sortOrders(list, mode, inverted, byId, rate) {
   const out = [...list].sort(cmp);
   return inverted ? out.reverse() : out;
 }
+function SortMenu({ sort, setSort }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  const label = (SORTS.find(([k]) => k === sort.mode) || SORTS[0])[1];
+  return html`<div class="sortmenu" ref=${ref}>
+    <button type="button" class="sort-btn" aria-haspopup="menu" aria-expanded=${open} onClick=${() => setOpen(!open)}>
+      <span aria-hidden="true">⇅</span> ${label}${sort.inv ? " (invertido)" : ""} <span class="muted" aria-hidden="true">${open ? "▲" : "▼"}</span>
+    </button>
+    ${open ? html`<div class="sort-pop" role="menu">
+      <div class="small muted" style="padding:6px 10px 4px">Ordenar por</div>
+      ${SORTS.map(([k, l]) => html`<button key=${k} type="button" role="menuitemradio" aria-checked=${sort.mode === k} class=${sort.mode === k ? "on" : ""} onClick=${() => { setSort({ mode: k, inv: false }); setOpen(false); }}><span class="chk-mark">${sort.mode === k ? "✓" : ""}</span>${l}</button>`)}
+      <div class="sep"></div>
+      <button type="button" role="menuitemcheckbox" aria-checked=${sort.inv} onClick=${() => { setSort({ ...sort, inv: !sort.inv }); setOpen(false); }}><span class="chk-mark">${sort.inv ? "✓" : ""}</span>Inverter a ordem</button>
+    </div>` : null}
+  </div>`;
+}
 function loadSort() { try { return JSON.parse(localStorage.getItem("encomendas-ordem")) || { mode: "recentes", inv: false }; } catch (e) { return { mode: "recentes", inv: false }; } }
 
 function Pedidos({ ctx }) {
@@ -572,11 +598,7 @@ function Pedidos({ ctx }) {
       <${Field} label="Pedido de"><input type="date" value=${f.de || ""} onChange=${(e) => set("de", e.target.value)} /><//>
       <${Field} label="até"><input type="date" value=${f.ate || ""} onChange=${(e) => set("ate", e.target.value)} /><//>
     </div>${has ? html`<div><button class="btn" onClick=${() => setFilters({})}>Limpar filtros</button></div>` : null}</div>` : null}</section>
-    <div class="sortbar" role="group" aria-label="Ordenar pedidos">
-      <span class="small muted">Ordenar:</span>
-      ${SORTS.map(([k, l]) => html`<button key=${k} type="button" class=${sort.mode === k ? "on" : ""} aria-pressed=${sort.mode === k} onClick=${() => setSort({ mode: k, inv: false })}>${l}${sort.mode === k && sort.inv ? " (invertido)" : ""}</button>`)}
-      <button type="button" class=${cx("inv", sort.inv && "on")} aria-pressed=${sort.inv} title="Inverter a ordem" onClick=${() => setSort({ ...sort, inv: !sort.inv })}>⇅ Inverter</button>
-    </div>
+    <${SortMenu} sort=${sort} setSort=${setSort} />
     <div class="stats">
       <${Stat} label="Pedidos" value=${list.length} />
       <${Stat} label="Peças" value=${num(pieces, 0)} />
