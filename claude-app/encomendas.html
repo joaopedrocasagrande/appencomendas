@@ -99,10 +99,10 @@ label.chk { display: flex; align-items: center; gap: 8px; font-size: .9rem; colo
 .p-acc { background: var(--accent-soft); color: var(--accent); }
 
 .stats { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; text-align: left; font: inherit; color: inherit; }
+.stat { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; text-align: left; font: inherit; color: inherit; }
 button.stat { cursor: pointer; }
 .stat .l { font-size: .75rem; color: var(--muted); }
-.stat .v { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.stat .v { font-family: var(--font-display); font-weight: 700; font-size: clamp(.9rem, 3.6vw, 1.2rem); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .stat .s { font-size: .75rem; color: var(--muted); }
 .v.good { color: var(--good); } .v.bad { color: var(--bad); } .v.warn { color: var(--warn); }
 
@@ -136,6 +136,12 @@ td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .radio.on { border-color: var(--accent); background: var(--accent-soft); }
 .toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 50; background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-weight: 500; font-size: .9rem; }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.sortbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sortbar button { flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 6px 12px; font: 500 .82rem var(--font-body); cursor: pointer; white-space: nowrap; }
+.sortbar button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.sortbar button.inv { border-style: dashed; color: var(--muted); }
+.sortbar button.inv.on { border-style: solid; color: var(--accent-fg); }
+.sortbar .small { flex: 0 0 auto; }
 .tabs button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font: 500 .85rem var(--font-body); cursor: pointer; color: var(--fg); }
 .tabs button.on { background: var(--navy); color: var(--surface); border-color: var(--navy); }
 .err { color: var(--bad); font-size: .85rem; }
@@ -500,13 +506,53 @@ function filterOrders(D, byId, f) {
     if (f.situacao === "revisao" && !o.needsReview) return false;
     if (f.situacao === "imposto" && !t.taxAwaiting) return false;
     return true;
-  }).sort((a, b) => (b.o.orderDate || "").localeCompare(a.o.orderDate || "") || (b.o.number || 0) - (a.o.number || 0));
+  });
 }
 
+// ---------------- Ordenação da lista ----------------
+const SORTS = [
+  ["recentes", "Mais recentes"],
+  ["antigos", "Mais antigos"],
+  ["aberto", "Maior valor em aberto"],
+  ["total", "Maior valor total"],
+  ["pecas", "Mais peças"],
+  ["chegada", "Chegada mais próxima"],
+  ["atraso", "Mais atrasados"],
+  ["pago", "Mais pago (%)"],
+  ["fornecedor", "Fornecedor (A–Z)"],
+  ["status", "Etapa do pedido"],
+  ["numero", "Nº do pedido"],
+];
+const STATUS_ORDER = Object.keys(ORDER_STATUS);
+function sortOrders(list, mode, inverted, byId, rate) {
+  // Valores em dólar comparados em reais (cotação do pedido ou a de hoje)
+  const brl = (v, x) => (x.t.cur === "USD" ? v * (x.t.orate || rate || 1) : v);
+  const date = (d, empty) => d || empty;
+  const byNumDesc = (a, b) => (b.o.number || 0) - (a.o.number || 0);
+  const cmp = {
+    recentes: (a, b) => date(b.o.orderDate, "").localeCompare(date(a.o.orderDate, "")) || byNumDesc(a, b),
+    antigos: (a, b) => date(a.o.orderDate, "9999").localeCompare(date(b.o.orderDate, "9999")) || -byNumDesc(a, b),
+    aberto: (a, b) => brl(Math.max(b.t.pending, 0), b) - brl(Math.max(a.t.pending, 0), a) || byNumDesc(a, b),
+    total: (a, b) => brl(b.t.supplierTotal, b) - brl(a.t.supplierTotal, a) || byNumDesc(a, b),
+    pecas: (a, b) => b.t.pieces - a.t.pieces || byNumDesc(a, b),
+    chegada: (a, b) => (CLOSED.includes(a.o.status) - CLOSED.includes(b.o.status)) || date(a.o.expectedDate, "9999").localeCompare(date(b.o.expectedDate, "9999")) || byNumDesc(a, b),
+    atraso: (a, b) => (b.late - a.late) || date(a.o.expectedDate, "9999").localeCompare(date(b.o.expectedDate, "9999")) || byNumDesc(a, b),
+    pago: (a, b) => (b.t.supplierTotal > 0 ? b.t.paid / b.t.supplierTotal : 0) - (a.t.supplierTotal > 0 ? a.t.paid / a.t.supplierTotal : 0) || byNumDesc(a, b),
+    fornecedor: (a, b) => (byId.suppliers[a.o.supplierId]?.name || "~").localeCompare(byId.suppliers[b.o.supplierId]?.name || "~", "pt-BR") || byNumDesc(a, b),
+    status: (a, b) => STATUS_ORDER.indexOf(a.o.status) - STATUS_ORDER.indexOf(b.o.status) || byNumDesc(a, b),
+    numero: byNumDesc,
+  }[mode] || byNumDesc;
+  const out = [...list].sort(cmp);
+  return inverted ? out.reverse() : out;
+}
+function loadSort() { try { return JSON.parse(localStorage.getItem("encomendas-ordem")) || { mode: "recentes", inv: false }; } catch (e) { return { mode: "recentes", inv: false }; } }
+
 function Pedidos({ ctx }) {
-  const { D, byId, go, filters: f, setFilters } = ctx;
+  const { D, byId, go, filters: f, setFilters, curRate } = ctx;
   const [open, setOpen] = useState(Object.values(f).some(Boolean));
-  const list = filterOrders(D, byId, f);
+  const [sort, setSortState] = useState(loadSort);
+  const setSort = (v) => { setSortState(v); try { localStorage.setItem("encomendas-ordem", JSON.stringify(v)); } catch (e) {} };
+  const list = sortOrders(filterOrders(D, byId, f), sort.mode, sort.inv, byId, curRate?.usdBrl);
   const set = (k, v) => setFilters({ ...f, [k]: v });
   const pend = { USD: 0, BRL: 0 }; let pieces = 0, extras = 0;
   for (const x of list) { if (x.t.pending > 0) pend[x.t.cur] += x.t.pending; pieces += x.t.pieces; extras += x.t.extrasPendingBRL; }
@@ -526,6 +572,11 @@ function Pedidos({ ctx }) {
       <${Field} label="Pedido de"><input type="date" value=${f.de || ""} onChange=${(e) => set("de", e.target.value)} /><//>
       <${Field} label="até"><input type="date" value=${f.ate || ""} onChange=${(e) => set("ate", e.target.value)} /><//>
     </div>${has ? html`<div><button class="btn" onClick=${() => setFilters({})}>Limpar filtros</button></div>` : null}</div>` : null}</section>
+    <div class="sortbar" role="group" aria-label="Ordenar pedidos">
+      <span class="small muted">Ordenar:</span>
+      ${SORTS.map(([k, l]) => html`<button key=${k} type="button" class=${sort.mode === k ? "on" : ""} aria-pressed=${sort.mode === k} onClick=${() => setSort({ mode: k, inv: false })}>${l}${sort.mode === k && sort.inv ? " (invertido)" : ""}</button>`)}
+      <button type="button" class=${cx("inv", sort.inv && "on")} aria-pressed=${sort.inv} title="Inverter a ordem" onClick=${() => setSort({ ...sort, inv: !sort.inv })}>⇅ Inverter</button>
+    </div>
     <div class="stats">
       <${Stat} label="Pedidos" value=${list.length} />
       <${Stat} label="Peças" value=${num(pieces, 0)} />
