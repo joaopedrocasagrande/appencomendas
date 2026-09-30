@@ -1,4 +1,4 @@
-<title>Encomendas China</title>
+<title>APP Controle de Pedidos Sob Encomenda</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
@@ -51,7 +51,11 @@ h2 { font-size: 1.05rem; }
 
 header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
 .top-in { max-width: 1100px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.brand { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--navy); display: flex; align-items: center; gap: 8px; }
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--navy); display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0; text-align: left; }
+.brand-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.brand-name { font-size: clamp(.68rem, 3.05vw, 1.05rem); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dollar-link { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--muted); font: 600 .62rem var(--font-body); cursor: pointer; padding: 0; line-height: 16px; }
+.dollar-link:hover { color: var(--accent); border-color: var(--accent); }
 .brand-mark { width: 22px; height: 16px; border-radius: 3px; background: repeating-linear-gradient(90deg, var(--accent) 0 3px, transparent 3px 5px); border: 2px solid var(--accent); }
 nav.desk { display: none; gap: 2px; }
 nav.desk button { background: none; border: 0; padding: 7px 12px; border-radius: 8px; color: var(--muted); font: 500 .92rem var(--font-body); cursor: pointer; }
@@ -273,7 +277,7 @@ function totals(o) {
   const items = o.items || [], expenses = o.expenses || [], pays = o.payments || [], taxes = o.taxPayments || [];
   const pieces = items.reduce((s, i) => s + n0(i.pieces), 0);
   const itemsTotal = items.reduce((s, i) => s + n0(i.pieces) * n0(i.unitPrice), 0);
-  const supplierExpenses = expenses.filter((e) => e.chargedBySupplier).reduce((s, e) => s + to(n0(e.amount), e.currency, null, cur), 0);
+  const supplierExpenses = expenses.filter((e) => e.chargedBySupplier).reduce((s, e) => s + payTo(e, cur), 0);
   const supplierTotal = r2(itemsTotal + n0(o.freight) - n0(o.discount) + supplierExpenses);
   // Pedido em dólar com total em reais digitado à mão: vale a cotação efetiva (só se o total em dólar não mudou desde então)
   const manualBRL = cur === "USD" && o.totalBRL > 0 && supplierTotal > 0 && Math.abs(n0(o.totalBRLFor) - supplierTotal) < 0.01;
@@ -286,9 +290,9 @@ function totals(o) {
   else if (pending <= 0.01) payStatus = "pago";
   else if (paid > 0) payStatus = "parcial";
   const taxPaidBRL = r2(o.taxMode === "por_fora" ? taxes.reduce((s, t) => s + payTo(t, "BRL"), 0) : 0);
-  const otherBRL = expenses.filter((e) => !e.chargedBySupplier).reduce((s, e) => s + to(n0(e.amount), e.currency, null, "BRL"), 0);
+  const otherBRL = expenses.filter((e) => !e.chargedBySupplier).reduce((s, e) => s + payTo(e, "BRL"), 0);
   const extrasBRL = r2(taxPaidBRL + otherBRL);
-  const extrasPendingBRL = r2(expenses.filter((e) => !e.chargedBySupplier && !e.paid).reduce((s, e) => s + to(n0(e.amount), e.currency, null, "BRL"), 0));
+  const extrasPendingBRL = r2(expenses.filter((e) => !e.chargedBySupplier && !e.paid).reduce((s, e) => s + payTo(e, "BRL"), 0));
   const taxAwaiting = o.taxMode === "por_fora" && taxes.length === 0 && !o.taxDone;
   // Previsão de imposto (em R$): o que falta pagar dela conta como "a pagar" até o imposto ser marcado como concluído
   const taxForecastBRL = o.taxMode === "por_fora" ? r2(n0(o.taxForecast)) : 0;
@@ -574,7 +578,7 @@ function App() {
   }, [D]);
 
   if (!st.ready) return html`<div class="loading">Carregando…</div>`;
-  if (st.noDb) return html`<main class="page"><div class="card"><div class="cb"><h1>Encomendas China</h1><p>Para ver e salvar os pedidos, abra este app pelo claude.ai (navegador ou app do Claude) com a sua conta.</p></div></div></main>`;
+  if (st.noDb) return html`<main class="page"><div class="card"><div class="cb"><h1>APP Controle de Pedidos Sob Encomenda</h1><p>Para ver e salvar os pedidos, abra este app pelo claude.ai (navegador ou app do Claude) com a sua conta.</p></div></div></main>`;
 
   const ctx = { st, api, D, byId, go, notify, filters, setFilters, today: t, curRate: cur, canWrite: st.canWrite, isAdmin: st.isAdmin };
   const active = ["pedido", "conferencia", "editar", "novo"].includes(view.name) ? "pedidos" : view.name;
@@ -592,7 +596,8 @@ function App() {
 
   return html`
     <header class="top"><div class="top-in">
-      <button class="brand" style="background:none;border:0;cursor:pointer" onClick=${() => go("painel")}><span class="brand-mark"></span>Encomendas</button>
+      <div class="brand-wrap"><button class="brand" style="background:none;border:0;cursor:pointer" onClick=${() => go("painel")}><span class="brand-mark"></span><span class="brand-name">APP Controle de Pedidos Sob Encomenda</span></button>
+        <button class="dollar-link" id="go-dolar" title="Cotação do dólar" aria-label="Cotação do dólar" onClick=${() => go("dolar")}>D</button></div>
       <nav class="desk">${NAV.map(([k, l]) => html`<button key=${k} class=${active === k ? "on" : ""} onClick=${() => go(k)}>${l}</button>`)}</nav>
     </div></header>
     ${!st.canWrite ? html`<div style="max-width:1100px;margin:10px auto 0;padding:0 16px"><div class="banner b-info">Você está só visualizando. Peça ao dono do app acesso de "Contributor" para cadastrar e editar.</div></div>` : null}
@@ -649,7 +654,7 @@ function Painel({ ctx }) {
       <${Card} title=${"Atrasados (" + late.length + ")"}><${OList} list=${late} empty="Nenhum pedido atrasado." right=${(x) => html`<span style="color:var(--bad)">Previsto ${fdate(x.o.expectedDate)}</span>`} /><//>
       <${Card} title=${"Chegando em 15 dias (" + arriving.length + ")"}><${OList} list=${arriving} empty="Nenhuma chegada prevista nos próximos 15 dias." right=${(x) => fdate(x.o.expectedDate)} /><//>
       <${Card} title="A pagar por fornecedor">${Object.values(bySup).length ? html`<div class="list">${Object.values(bySup).sort((a, b) => toBRL(b) - toBRL(a)).map((s) => html`
-        <div class="li" key=${s.name} style="cursor:pointer" onClick=${() => toList({ fornecedor: s.id || "", pagamento: "em_aberto" })}><strong>${s.name}</strong><span class="tab" style="text-align:right"><div>${money(s.total)}</div>${s.USD > 0 ? html`<div class="small muted">inclui ${money(s.USD, "USD")}</div>` : null}</span></div>`)}</div>` : html`<div class="empty">Nenhum saldo a pagar.</div>`}<//>
+        <div class="li" key=${s.id || "sem"} style="cursor:pointer" onClick=${() => toList({ fornecedor: s.id || "", pagamento: "em_aberto" })}><strong>${s.name}</strong><span class="tab" style="text-align:right"><div>${money(s.total)}</div>${s.USD > 0 ? html`<div class="small muted">inclui ${money(s.USD, "USD")}</div>` : null}</span></div>`)}</div>` : html`<div class="empty">Nenhum saldo a pagar.</div>`}<//>
       <${Card} title=${"Precisam de atenção (" + attention.length + ")"}><${OList} list=${attention} empty="Nada pendente." right=${(x) => html`<span class="row" style="justify-content:flex-end">${x.al.map(([tone, l]) => html`<${Pill} key=${l} tone=${tone}>${l}<//>`)}</span>`} /><//>
     </div>`;
 }
@@ -855,7 +860,13 @@ function OrderForm({ ctx, id, from }) {
     ...i, ...(src ? { id: uid(), receivedQty: null, defectiveQty: null, checkNotes: null, receivedSizes: null } : {}), product: byId.products[i.productId]?.name || "", boxes: toInput(i.boxes), ppb: toInput(i.ppb), grids: toInput(i.grids), ppg: toInput(i.ppg), pieces: String(i.pieces ?? ""), unitPrice: toInput(i.unitPrice),
     sizes: i.sizes ? Object.entries(i.sizes).map(([size, q]) => ({ size, qty: String(q) })) : null, auto: false,
   })) : [emptyItem()]);
-  const [expenses, setExpenses] = useState(() => (existing?.expenses || []).map((e) => ({ ...e, amount: toInput(e.amount) })));
+  const [expenses, setExpenses] = useState(() => (existing?.expenses || []).map((e) => ({ ...e, amount: toInput(e.amount), brl: e.currency === "USD" && e.brlAmount != null ? toInput(e.brlAmount) : "", brlManual: e.currency === "USD" && e.brlAmount != null })));
+  const expBRL = (e) => (e.currency === "USD" && e.brlManual && parseDec(e.brl) > 0 ? r2(parseDec(e.brl)) : null);
+  // "Valor em reais" de uma despesa em dólar: calculado pela cotação do pedido, editável à mão
+  const expConv = (e) => {
+    const up = (patch) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, ...patch } : x)));
+    return { val: e.brl || "", manual: !!e.brlManual, setVal: (v) => up({ brl: v }), setManual: (m) => up({ brlManual: m }), clear: () => up({ brl: "", brlManual: false }) };
+  };
   const [rateTouched, setRateTouched] = useState(!!existing?.rate);
   // Título: preenchido sozinho com "Fornecedor - Modalidade" até a pessoa digitar outro
   const [titleTouched, setTitleTouched] = useState(!!existing?.title);
@@ -891,7 +902,7 @@ function OrderForm({ ctx, id, from }) {
   const totIn = {
     currency: cur, rate: parseDec(f.rate), freight: parseDec(f.freight), discount: parseDec(f.discount), taxMode: f.taxMode, taxAmount: parseDec(f.taxAmount), taxForecast: parseDec(f.taxForecast),
     items: items.map((i) => ({ pieces: parseDec(i.pieces) || 0, unitPrice: parseDec(i.unitPrice) || 0 })),
-    expenses: expenses.map((e) => ({ amount: parseDec(e.amount) || 0, currency: e.currency, chargedBySupplier: e.chargedBySupplier, paid: e.paid })), payments: [], taxPayments: [],
+    expenses: expenses.map((e) => ({ amount: parseDec(e.amount) || 0, currency: e.currency, brlAmount: expBRL(e), chargedBySupplier: e.chargedBySupplier, paid: e.paid })), payments: [], taxPayments: [],
   };
   const tot0 = totals(totIn);
   const mTot = cur === "USD" && cvTotal.manual ? parseDec(cvTotal.val) : null;
@@ -927,7 +938,7 @@ function OrderForm({ ctx, id, from }) {
           return { id: i.id, productId: prodIds[key(i.product)], variant: norm(i.variant) || null, boxes: parseDec(i.boxes), ppb: parseDec(i.ppb), grids: parseDec(i.grids), ppg: parseDec(i.ppg), pieces: Math.round(parseDec(i.pieces) || 0), unitPrice: parseDec(i.unitPrice) || 0, sizes,
             receivedQty: old.receivedQty ?? null, defectiveQty: old.defectiveQty ?? null, checkNotes: old.checkNotes ?? null, receivedSizes: old.receivedSizes ?? null };
         }),
-        expenses: expenses.map((e) => ({ id: e.id, description: norm(e.description), amount: parseDec(e.amount) || 0, currency: e.currency, chargedBySupplier: !!e.chargedBySupplier, paid: e.chargedBySupplier ? false : !!e.paid })),
+        expenses: expenses.map((e) => ({ id: e.id, description: norm(e.description), amount: parseDec(e.amount) || 0, currency: e.currency, brlAmount: expBRL(e), chargedBySupplier: !!e.chargedBySupplier, paid: e.chargedBySupplier ? false : !!e.paid })),
         payments: existing?.payments || [], taxPayments: existing?.taxPayments || [], trackings: existing?.trackings || [],
         createdAt: existing?.createdAt || now, updatedAt: now,
       };
@@ -1002,8 +1013,9 @@ function OrderForm({ ctx, id, from }) {
       ${expenses.length === 0 ? html`<p class="muted small" style="margin:0">Taxas, envio interno, despachante etc. Nenhuma despesa lançada.</p>` : expenses.map((e) => html`<div class="itembox" key=${e.id}>
         <div class="grid g2">
           <${Field} label="Descrição"><input value=${e.description} onInput=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, description: ev.target.value } : x)))} /><//>
-          <${Field} label="Valor" hint=${brlHint(e.amount, e.currency, frate)}><span class="money" data-sym=${SYM(e.currency)}><input inputmode="decimal" value=${e.amount} onInput=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, amount: ev.target.value } : x)))} /></span><//>
-          <${Field} label="Moeda"><select value=${e.currency} onChange=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, currency: ev.target.value } : x)))}><option value="BRL">R$</option><option value="USD">$</option></select><//>
+          <${Field} label="Valor"><span class="money" data-sym=${SYM(e.currency)}><input class="exp-amount" inputmode="decimal" value=${e.amount} onInput=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, amount: ev.target.value } : x)))} /></span><//>
+          <${Field} label="Moeda"><select class="exp-cur" value=${e.currency} onChange=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, currency: ev.target.value, brl: "", brlManual: false } : x)))}><option value="BRL">R$</option><option value="USD">$</option></select><//>
+          ${e.currency === "USD" ? convField(expConv(e), e.amount, "USD", "BRL", f.rate, "exp-brl-" + e.id) : null}
         </div>
         <div class="row between"><div class="row">
           <label class="chk"><input type="checkbox" checked=${e.chargedBySupplier} onChange=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, chargedBySupplier: ev.target.checked } : x)))} />Cobrada pelo fornecedor</label>
@@ -1069,7 +1081,7 @@ function OrderDetail({ ctx, id }) {
         <tr><td><strong>Total ao fornecedor</strong></td><td class="r"><strong>${M(tt.supplierTotal, cur, tt.orate, true)}</strong></td></tr></tbody></table>
       ${(o.expenses || []).length ? html`<div><div class="small muted" style="font-weight:600;margin-bottom:4px">OUTRAS DESPESAS</div><div class="list">${o.expenses.map((e) => html`<div class="li" key=${e.id}>
         <span>${e.description} <span class="small muted">${e.chargedBySupplier ? "(cobrada pelo fornecedor)" : e.paid ? "(paga)" : "(pendente)"}</span></span>
-        <span class="row"><strong class="tab">${M(e.amount, e.currency, tt.orate)}</strong>${!e.chargedBySupplier && canWrite ? html`<button class="btn sm" onClick=${() => patch({ expenses: o.expenses.map((x) => (x.id === e.id ? { ...x, paid: !x.paid } : x)) })}>${e.paid ? "Desmarcar pago" : "Marcar pago"}</button>` : null}</span></div>`)}</div></div>` : null}
+        <span class="row"><strong class="tab">${e.currency === "USD" && e.brlAmount != null ? html`${money(e.brlAmount)}<span class="brl">${money(e.amount, "USD")}</span>` : M(e.amount, e.currency, tt.orate)}</strong>${!e.chargedBySupplier && canWrite ? html`<button class="btn sm" onClick=${() => patch({ expenses: o.expenses.map((x) => (x.id === e.id ? { ...x, paid: !x.paid } : x)) })}>${e.paid ? "Desmarcar pago" : "Marcar pago"}</button>` : null}</span></div>`)}</div></div>` : null}
     <//>
 
     <${Payments} ctx=${ctx} o=${o} tt=${tt} patch=${patch} />
@@ -1440,7 +1452,7 @@ function Rates({ ctx }) {
     try { await api.setRate(day, v); notify("Cotação salva."); } catch (e) { console.error(e); setErr("Não foi possível salvar."); }
     setBusy(false);
   }
-  return html`<${Head} title="Cotação do dólar" />
+  return html`<${Head} title="Cotação do dólar" back=${() => ctx.go("painel")} />
     <p class="muted" style="margin:0">Defina o valor do dólar do dia. Ele é sugerido nos pedidos e pagamentos daquela data (você pode ajustar em cada um). Se um dia não tiver cotação, vale a última cadastrada antes dele.</p>
     <${Card} title=${todayRow ? "Hoje: $1 = " + money(todayRow.usdBrl) : "Cotação de hoje ainda não definida"}>
       ${canWrite ? html`<div class="row" style="align-items:flex-end">
@@ -1598,13 +1610,13 @@ function Precos({ ctx }) {
     for (const x of rows) for (const c of x.costs) {
       if (c.cost === null) continue;
       const gk = c.i.productId + "|" + key(c.i.variant || "");
-      const e = (g[gk] = g[gk] || { name: pname(c.i), variant: c.i.variant || "", n: 0, pcs: 0, sum: 0, min: Infinity, max: 0, last: null });
+      const e = (g[gk] = g[gk] || { gk, name: pname(c.i), variant: c.i.variant || "", n: 0, pcs: 0, sum: 0, min: Infinity, max: 0, last: null });
       e.n++; e.pcs += c.pieces; e.sum += c.cost * c.pieces; e.min = Math.min(e.min, c.cost); e.max = Math.max(e.max, c.cost);
       const d = x.arr || x.o.orderDate || "";
       if (!e.last || d > e.last.d || (d === e.last.d && x.o.number > e.last.o.number)) e.last = { d, o: x.o, cost: c.cost, final: x.st.final };
     }
     const list = Object.values(g).filter((e) => !k || key(e.name + " " + e.variant).includes(k)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.variant.localeCompare(b.variant, "pt-BR"));
-    body = list.length ? html`<div class="card"><div class="cb"><div class="list">${list.map((e) => html`<div class="li price-li" key=${e.name + e.variant}>
+    body = list.length ? html`<div class="card"><div class="cb"><div class="list">${list.map((e) => html`<div class="li price-li" key=${e.gk}>
       <div style="min-width:0"><strong>${e.name}</strong>${e.variant ? html` <span class="muted">· ${e.variant}</span>` : null}
         <div class="small muted">${e.n} pedido(s) · ${num(e.pcs, 0)} peças${e.n > 1 ? " · média " + money(e.sum / e.pcs) + " · de " + money(e.min) + " a " + money(e.max) : ""}</div>
         <div class="small muted">Último: <button class="link" onClick=${() => go("pedido", { id: e.last.o.id })}>#${e.last.o.number}</button>${e.last.d ? " (" + fdate(e.last.d) + ")" : ""}${e.last.final ? "" : " · estimado"}</div></div>
@@ -1662,7 +1674,7 @@ function Analises({ ctx }) {
     const g = {};
     for (const x of rows) {
       const id = x.o[field] || "sem";
-      const e = (g[id] = g[id] || { name: byId[coll][x.o[field]]?.name || "Não informado", n: 0, days: [], late: [], taxV: 0, base: 0, taxN: 0 });
+      const e = (g[id] = g[id] || { id, name: byId[coll][x.o[field]]?.name || "Não informado", n: 0, days: [], late: [], taxV: 0, base: 0, taxN: 0 });
       e.n++;
       const arr = arrivalDate(x.o);
       if (arr && x.o.orderDate) { e.days.push(daysBetween(x.o.orderDate, arr)); if (x.o.expectedDate) e.late.push(daysBetween(x.o.expectedDate, arr)); }
@@ -1673,7 +1685,7 @@ function Analises({ ctx }) {
   };
   const avg = (l) => (l.length ? l.reduce((s, v) => s + v, 0) / l.length : null);
   const DelTable = ({ list, title }) => html`<div class="tablewrap"><table><thead><tr><th>${title}</th><th class="r">Pedidos</th><th class="r">Chegaram</th><th class="r">Prazo médio</th><th class="r">vs. previsão</th><th class="r">Imposto</th></tr></thead><tbody>
-    ${list.map((e) => { const a = avg(e.days), l = avg(e.late); return html`<tr key=${e.name}><td>${e.name}</td><td class="r">${e.n}</td><td class="r">${e.days.length}</td>
+    ${list.map((e) => { const a = avg(e.days), l = avg(e.late); return html`<tr key=${e.id}><td>${e.name}</td><td class="r">${e.n}</td><td class="r">${e.days.length}</td>
       <td class="r">${a === null ? "—" : num(a, 0) + " dias"}</td>
       <td class="r" style=${l === null ? "" : l > 0.5 ? "color:var(--bad)" : "color:var(--good)"}>${l === null ? "—" : l > 0.5 ? num(l, 0) + " dias atrasado" : l < -0.5 ? num(-l, 0) + " dias antes" : "no prazo"}</td>
       <td class="r" title=${e.taxN + " pedido(s) com imposto resolvido"}>${e.base > 0 ? num((e.taxV / e.base) * 100, 1) + "%" : "—"}</td></tr>`; })}</tbody></table></div>`;
@@ -1695,7 +1707,7 @@ function Analises({ ctx }) {
     </div>
     <div class="cols2">
       <${Card} title="Gasto por mês (data do pedido)">${months.length ? html`<${Bars} fmt=${money} rows=${months.map((m) => ({ key: m, label: monthLabel(m), value: byM[m] || 0 }))} />` : html`<div class="empty">Sem pedidos no período.</div>`}<//>
-      <${Card} title="Por fornecedor">${sups.length ? html`<${Bars} fmt=${money} rows=${sups.map((s) => ({ key: s.name, label: s.name, value: s.v, sub: "· " + s.n + " ped. · " + (s.p > 0 ? money(s.v / s.p) + "/peça" : ""), onClick: s.id ? () => { setFilters({ fornecedor: s.id }); go("pedidos"); } : null }))} />` : html`<div class="empty">Sem pedidos no período.</div>`}<//>
+      <${Card} title="Por fornecedor">${sups.length ? html`<${Bars} fmt=${money} rows=${sups.map((s) => ({ key: s.id || "sem", label: s.name, value: s.v, sub: "· " + s.n + " ped. · " + (s.p > 0 ? money(s.v / s.p) + "/peça" : ""), onClick: s.id ? () => { setFilters({ fornecedor: s.id }); go("pedidos"); } : null }))} />` : html`<div class="empty">Sem pedidos no período.</div>`}<//>
     </div>
     <${Card} title="Prazo de entrega e imposto por modalidade">
       <${DelTable} list=${group("modeId", "modes")} title="Modalidade" />
