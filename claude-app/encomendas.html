@@ -306,7 +306,8 @@ function totals(o) {
   // Previsão de imposto (em R$): o que falta pagar dela conta como "a pagar" até o imposto ser marcado como concluído
   const taxForecastBRL = o.taxMode === "por_fora" ? r2(n0(o.taxForecast)) : 0;
   const taxForecastPendingBRL = o.taxMode === "por_fora" && !o.taxDone ? r2(Math.max(taxForecastBRL - taxPaidBRL, 0)) : 0;
-  const taxIncludedBRL = o.taxMode === "incluso" ? r2(to(n0(o.taxAmount), cur, null, "BRL")) : 0;
+  // Imposto incluso: valor por peça, só informativo (já está dentro do preço do produto; não soma no custo)
+  const taxIncludedBRL = o.taxMode === "incluso" ? r2(to(n0(o.taxAmount) * pieces, cur, null, "BRL")) : 0;
   const paidBRL = pays.reduce((s, p) => s + payTo(p, "BRL"), 0);
   const pendingBRL = to(Math.max(pending, 0), cur, null, "BRL");
   const landedBRL = r2(paidBRL + pendingBRL + extrasBRL + taxForecastPendingBRL);
@@ -1012,7 +1013,7 @@ function OrderForm({ ctx, id, from }) {
         ${cur === "USD" ? convField(cvTotal, tot.supplierTotal > 0 ? String(tot.supplierTotal) : "", "USD", "BRL", f.rate, "f-total-brl", "Total do pedido em reais (" + money(tot.supplierTotal, "USD") + ")") : null}
       </div>
       <div class="radios">${Object.keys(TAX_LABEL).map((m) => html`<label key=${m} class=${cx("radio", f.taxMode === m && "on")}><input type="radio" name="taxMode" checked=${f.taxMode === m} onChange=${() => set("taxMode", m)} /><span><strong>${TAX_LABEL[m]}</strong><div class="small muted">${TAX_HINT[m]}</div></span></label>`)}</div>
-      ${f.taxMode === "incluso" ? html`<${Field} label="Valor do imposto incluso — opcional" hint=${brlHint(f.taxAmount, cur, frate)}><span class="money" data-sym=${SYM(cur)}><input id="f-tx" inputmode="decimal" value=${f.taxAmount} onInput=${(e) => set("taxAmount", e.target.value)} /></span><//>` : null}
+      ${f.taxMode === "incluso" ? html`<${Field} label="Imposto incluso por peça — opcional" hint=${[brlHint(f.taxAmount, cur, frate), "Só informativo: já está dentro do preço do produto, não soma no custo."].filter(Boolean).join(" · ")}><span class="money" data-sym=${SYM(cur)}><input id="f-tx" inputmode="decimal" value=${f.taxAmount} onInput=${(e) => set("taxAmount", e.target.value)} /></span><//>` : null}
       ${f.taxMode === "por_fora" ? html`<div class="grid g2">
         <${Field} label="Imposto previsto — opcional" hint="Quanto você espera pagar de imposto. Entra no painel como imposto a pagar até você marcar o imposto como concluído."><span class="money" data-sym="R$"><input id="f-txf" inputmode="decimal" value=${f.taxForecast} onInput=${(e) => set("taxForecast", e.target.value)} placeholder="0,00" /></span><//>
       </div>` : null}
@@ -1263,7 +1264,7 @@ function Taxes({ ctx, o, tt, patch }) {
   const list = o.taxPayments || [];
   return html`<${Card} title="Imposto">
     <div><strong>${TAX_LABEL[o.taxMode]}</strong> <span class="muted">— ${TAX_HINT[o.taxMode]}</span></div>
-    ${o.taxMode === "incluso" && o.taxAmount > 0 ? html`<div>Valor incluso: <strong>${M(o.taxAmount, o.currency, tt.orate)}</strong></div>` : null}
+    ${o.taxMode === "incluso" && o.taxAmount > 0 ? html`<div>Imposto incluso: <strong>${M(o.taxAmount, o.currency, tt.orate)}</strong> por peça <span class="muted">(total ${money(tt.taxIncludedBRL)} · já dentro do preço do produto)</span></div>` : null}
     ${o.taxMode === "por_fora" ? html`<div style="background:var(--surface-2);border-radius:8px;padding:12px;display:grid;gap:8px">
       <div class="row between"><strong>Previsão × real</strong>${tt.taxDone ? html`<${Pill} tone="p-good">Imposto concluído<//>` : tt.taxForecastPendingBRL > 0 ? html`<${Pill} tone="p-warn">Falta ${money(tt.taxForecastPendingBRL)} (previsto)<//>` : null}</div>
       ${fcEdit ? html`<div class="row" style="align-items:flex-end">
@@ -1538,17 +1539,17 @@ function costStatus(tt) {
   return { final: why.length === 0, why };
 }
 // Custo do pedido em R$ separado em partes. A parte do fornecedor (produtos, frete, desconto e despesas cobradas por ele)
-// usa o que foi pago de verdade + o saldo; imposto = pago por fora + previsto não concluído (ou o valor incluso informado).
+// usa o que foi pago de verdade + o saldo; imposto = pago por fora + previsto não concluído.
+// Imposto incluso não entra aqui: ele já está dentro do preço do produto.
 function costParts(tt) {
   const supBRL = tt.paidBRL + (tt.pending > 0 ? tt.pendingBRL : 0);
   const eff = tt.supplierTotal > 0 ? supBRL / tt.supplierTotal : tt.cur === "USD" ? tt.orate || 0 : 1;
-  const incl = tt.taxIncludedBRL || 0;
   return {
     eff,
-    produto: tt.itemsTotal * eff - incl,
+    produto: tt.itemsTotal * eff,
     frete: tt.freight * eff,
     desconto: tt.discount * eff,
-    imposto: tt.taxPaidBRL + tt.taxForecastPendingBRL + incl,
+    imposto: tt.taxPaidBRL + tt.taxForecastPendingBRL,
     outras: tt.extrasBRL - tt.taxPaidBRL + tt.supplierExpenses * eff,
   };
 }
@@ -1560,7 +1561,8 @@ function itemCosts(o, tt) {
     const pieces = n0(i.pieces), up = n0(i.unitPrice);
     if (!(up > 0) || !(tt.itemsTotal > 0)) return { i, pieces, cost: null, costGood: null, good: null, parts: null };
     const w = up / tt.itemsTotal;
-    const parts = { produto: up * P.eff - (tt.taxIncludedBRL || 0) * w, frete: P.frete * w, desconto: P.desconto * w, imposto: P.imposto * w, outras: P.outras * w };
+    const parts = { produto: up * P.eff, frete: P.frete * w, desconto: P.desconto * w, imposto: P.imposto * w, outras: P.outras * w,
+      inclTax: o.taxMode === "incluso" && n0(o.taxAmount) > 0 ? n0(o.taxAmount) * P.eff : 0 };
     const cost = parts.produto + parts.frete - parts.desconto + parts.imposto + parts.outras;
     const good = i.receivedQty != null ? Math.max(n0(i.receivedQty) - n0(i.defectiveQty), 0) : null;
     const costGood = good !== null && good > 0 && good < pieces ? (cost * pieces) / good : null;
@@ -1574,7 +1576,9 @@ function CostBreak({ parts, cost, sale, cfg, usd, label = "Custo por peça" }) {
     ${line("Produto", html`${money(parts.produto)}${usd ? html`<span class="brl">${usd}</span>` : null}`)}
     ${line("Frete", money(parts.frete))}
     ${parts.desconto > 0.004 ? line("Desconto", "− " + money(parts.desconto)) : null}
-    ${line("Imposto", money(parts.imposto))}
+    ${parts.inclTax > 0 && !(parts.imposto > 0.004)
+      ? line("Imposto", html`<span class="muted small">incluso no produto (${money(parts.inclTax)})</span>`)
+      : line("Imposto", money(parts.imposto))}
     ${line("Outras despesas", money(parts.outras))}
     ${line(label, money(cost), "cb-total")}
     ${line("Venda sugerida (+" + num(cfg.markup, 0) + "%" + (cfg.round90 ? " · final ,90" : "") + ")", money(sale), "cb-sale")}
@@ -1650,9 +1654,9 @@ function Precos({ ctx }) {
     for (const x of rows) for (const c of x.costs) {
       if (!c.parts || !(c.pieces > 0)) continue;
       const gk = c.i.productId + "|" + key(c.i.variant || "");
-      const e = (g[gk] = g[gk] || { gk, i: c.i, n: 0, pcs: 0, produto: 0, frete: 0, desconto: 0, imposto: 0, outras: 0, total: 0, min: Infinity, max: 0, last: null, allFinal: true });
+      const e = (g[gk] = g[gk] || { gk, i: c.i, n: 0, pcs: 0, produto: 0, frete: 0, desconto: 0, imposto: 0, outras: 0, inclTax: 0, total: 0, min: Infinity, max: 0, last: null, allFinal: true });
       e.n++; e.pcs += c.pieces;
-      for (const f of ["produto", "frete", "desconto", "imposto", "outras"]) e[f] += c.parts[f] * c.pieces;
+      for (const f of ["produto", "frete", "desconto", "imposto", "outras", "inclTax"]) e[f] += c.parts[f] * c.pieces;
       e.total += c.cost * c.pieces; e.min = Math.min(e.min, c.cost); e.max = Math.max(e.max, c.cost);
       if (!x.st.final) e.allFinal = false;
       const d = x.arr || x.o.orderDate || "";
@@ -1660,7 +1664,7 @@ function Precos({ ctx }) {
     }
     const list = Object.values(g).filter((e) => !k || key(pname(e.i) + " " + (e.i.variant || "")).includes(k)).sort((a, b) => pname(a.i).localeCompare(pname(b.i), "pt-BR") || (a.i.variant || "").localeCompare(b.i.variant || "", "pt-BR"));
     body = list.length ? html`<div class="card"><div class="cb">${list.map((e) => {
-      const avg = { produto: e.produto / e.pcs, frete: e.frete / e.pcs, desconto: e.desconto / e.pcs, imposto: e.imposto / e.pcs, outras: e.outras / e.pcs };
+      const avg = { produto: e.produto / e.pcs, frete: e.frete / e.pcs, desconto: e.desconto / e.pcs, imposto: e.imposto / e.pcs, outras: e.outras / e.pcs, inclTax: e.inclTax / e.pcs };
       const t = e.total / e.pcs;
       return html`<div class="price-item" key=${e.gk}>
         <${Name} i=${e.i} extra=${e.n + " pedido(s) · " + num(e.pcs, 0) + " peças" + (e.allFinal ? "" : " · inclui custo estimado")} />
