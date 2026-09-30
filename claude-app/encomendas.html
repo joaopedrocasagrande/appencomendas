@@ -105,10 +105,16 @@ label.chk { display: flex; align-items: center; gap: 8px; font-size: .9rem; colo
 .p-acc { background: var(--accent-soft); color: var(--accent); }
 
 .stats { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+@media (min-width: 700px) { .stats { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); } }
 .stat { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; text-align: left; font: inherit; color: inherit; }
 button.stat { cursor: pointer; }
 .stat .l { font-size: .75rem; color: var(--muted); }
 .stat .v { font-family: var(--font-display); font-weight: 700; font-size: clamp(.9rem, 3.6vw, 1.2rem); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* O valor se ajusta à largura do quadro para nunca quebrar em duas linhas */
+@supports (container-type: inline-size) {
+  .stat { container-type: inline-size; }
+  .stat .v { font-size: clamp(.8rem, 10cqi, 1.3rem); white-space: nowrap; overflow-wrap: normal; }
+}
 .stat .s { font-size: .75rem; color: var(--muted); }
 .v.good { color: var(--good); } .v.bad { color: var(--bad); } .v.warn { color: var(--warn); }
 
