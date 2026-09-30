@@ -1010,6 +1010,16 @@ function Taxes({ ctx, o, tt, patch }) {
     setFcEdit(false);
   }
   const diff = tt.taxForecastBRL > 0 && tt.taxPaidBRL > 0 ? (tt.taxPaidBRL - tt.taxForecastBRL) / tt.taxForecastBRL * 100 : null;
+  const [editId, setEditId] = useState(null);
+  const formRef = useRef(null);
+  function reset() {
+    setEditId(null); setDate(t); setAmount(""); setCurrency("BRL"); setRate(toInput(rateFor(D.rates, t)?.usdBrl)); setTrk(""); setNotes(""); setErr(null);
+  }
+  function startEdit(x) {
+    setEditId(x.id); setDate(x.date || ""); setAmount(toInput(x.amount)); setCurrency(x.currency || "BRL");
+    setRate(toInput(x.rate ?? rateFor(D.rates, x.date || t)?.usdBrl)); setTrk(x.trackingId || ""); setNotes(x.notes || ""); setErr(null); setOpen(true);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  }
   async function add() {
     setErr(null);
     const a = parseDec(amount), r = parseDec(rate);
@@ -1017,9 +1027,16 @@ function Taxes({ ctx, o, tt, patch }) {
     if (currency === "USD" && !r) return setErr("Informe a cotação para converter em reais.");
     setBusy(true);
     try {
-      await api.patchOrder(o.id, { taxMode: o.taxMode === "sem" ? "por_fora" : o.taxMode, taxPayments: [...(o.taxPayments || []), { id: uid(), date, amount: a, currency, rate: currency === "USD" ? r : null, trackingId: trk || null, notes: notes.trim() || null }] });
-      setAmount(""); setNotes(""); notify("Imposto lançado.");
-    } catch (e) { console.error(e); setErr("Não foi possível lançar. Tente de novo."); }
+      const tax = { id: editId || uid(), date, amount: a, currency, rate: currency === "USD" ? r : null, trackingId: trk || null, notes: notes.trim() || null };
+      if (editId) {
+        if (!(o.taxPayments || []).some((x) => x.id === editId)) { reset(); setBusy(false); return setErr("Este lançamento foi excluído por outra pessoa."); }
+        await api.patchOrder(o.id, { taxPayments: o.taxPayments.map((x) => (x.id === editId ? { ...x, ...tax } : x)) });
+        reset(); notify("Lançamento de imposto alterado.");
+      } else {
+        await api.patchOrder(o.id, { taxMode: o.taxMode === "sem" ? "por_fora" : o.taxMode, taxPayments: [...(o.taxPayments || []), tax] });
+        setAmount(""); setNotes(""); notify("Imposto lançado.");
+      }
+    } catch (e) { console.error(e); setErr(editId ? "Não foi possível salvar a alteração. Tente de novo." : "Não foi possível lançar. Tente de novo."); }
     setBusy(false);
   }
   const list = o.taxPayments || [];
@@ -1038,11 +1055,11 @@ function Taxes({ ctx, o, tt, patch }) {
     </div>` : null}
     ${tt.taxAwaiting ? html`<div class="banner b-warn">Imposto por fora ainda não lançado. Quando pagar, lance abaixo.</div>` : null}
     ${o.taxMode !== "incluso" ? html`
-      ${list.length ? html`<div class="list">${list.map((x) => html`<div class="li" key=${x.id}><div><strong class="tab">${fdate(x.date)} · ${money(x.amount, x.currency)}</strong>
+      ${list.length ? html`<div class="list">${list.map((x) => html`<div class="li" key=${x.id} style=${editId === x.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(x.date)} · ${money(x.amount, x.currency)}</strong>
         <div class="small muted">${[(o.trackings || []).find((k) => k.id === x.trackingId) ? "Pacote " + o.trackings.find((k) => k.id === x.trackingId).code : "Pedido todo", x.rate ? "cotação " + money(x.rate) : null, x.notes].filter(Boolean).join(" · ")}</div></div>
-        ${isAdmin ? html`<${Confirm} small onConfirm=${() => patch({ taxPayments: list.filter((y) => y.id !== x.id) }, "Lançamento excluído.")} />` : null}</div>`)}
+        <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(x)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === x.id) reset(); patch({ taxPayments: list.filter((y) => y.id !== x.id) }, "Lançamento excluído."); }} />` : null}</span></div>`)}
         <div class="li"><strong>Total de imposto pago</strong><strong class="tab">${money(tt.taxPaidBRL)}</strong></div></div>` : null}
-      ${canWrite ? html`<details open=${open} onToggle=${(e) => setOpen(e.target.open)} style="background:var(--surface-2);border-radius:8px;padding:12px"><summary>Lançar imposto pago</summary>
+      ${canWrite ? html`<details ref=${formRef} open=${open} onToggle=${(e) => setOpen(e.target.open)} style=${"background:var(--surface-2);border-radius:8px;padding:12px" + (editId ? ";outline:2px solid var(--accent)" : "")}><summary>${editId ? "Editar imposto pago" : "Lançar imposto pago"}</summary>
         <div class="grid g2" style="margin-top:10px">
           <${Field} label="Data do pagamento"><input type="date" value=${date} onChange=${(e) => { setDate(e.target.value); const rr = rateFor(D.rates, e.target.value); if (rr) setRate(toInput(rr.usdBrl)); }} /><//>
           <${Field} label="Valor pago"><span class="money" data-sym=${SYM(currency)}><input inputmode="decimal" value=${amount} onInput=${(e) => setAmount(e.target.value)} /></span><//>
@@ -1052,7 +1069,7 @@ function Taxes({ ctx, o, tt, patch }) {
           <${Field} label="Observação"><input value=${notes} onInput=${(e) => setNotes(e.target.value)} /><//>
         </div>
         ${err ? html`<div class="err">${err}</div>` : null}
-        <div style="margin-top:10px"><button class="btn pri" disabled=${busy} onClick=${add}>${busy ? "Lançando…" : "Lançar imposto"}</button></div></details>` : null}` : null}
+        <div class="row" style="margin-top:10px"><button class="btn pri" id="tax-save" disabled=${busy} onClick=${add}>${busy ? "Salvando…" : editId ? "Salvar alteração" : "Lançar imposto"}</button>${editId ? html`<button class="btn" onClick=${reset}>Cancelar</button>` : null}</div></details>` : null}` : null}
   <//>`;
 }
 
