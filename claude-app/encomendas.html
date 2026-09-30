@@ -43,6 +43,8 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 h1 { font-size: 1.45rem; }
 h2 { font-size: 1.05rem; }
 .tab { font-variant-numeric: tabular-nums; }
+.brl { font-size: .74em; font-weight: 500; color: var(--muted); margin-left: 6px; white-space: nowrap; }
+.brl.blk { display: block; margin-left: 0; }
 .mono { font-family: var(--font-mono); font-size: .9em; }
 .muted { color: var(--muted); }
 .small { font-size: .82rem; }
@@ -229,13 +231,15 @@ const VARIANTS = ["Masculino", "Feminino", "Infantil", "Kit Infantil", "Goleiro"
 const SIZES = ["PP", "P", "M", "G", "GG", "XGG", "2XL", "3XL", "4XL"];
 
 // ---------------- Cálculos ----------------
+// Cotação usada quando o pedido não tem cotação própria (a de hoje; definida pelo App a cada render)
+let FALLBACK_RATE = null;
 function convert(amount, from, to, rate) { if (from === to) return amount; if (!rate) return null; return from === "USD" ? amount * rate : amount / rate; }
 const n0 = (v) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 const r2 = (v) => Math.round(v * 100) / 100;
 
 function totals(o) {
   const cur = o.currency || "BRL";
-  const orate = o.rate > 0 ? o.rate : null;
+  const orate = o.rate > 0 ? o.rate : FALLBACK_RATE;
   let missingRate = false;
   const to = (amt, from, rate, target) => { const v = convert(amt, from, target, rate || orate); if (v === null) { missingRate = true; return 0; } return v; };
   const items = o.items || [], expenses = o.expenses || [], pays = o.payments || [], taxes = o.taxPayments || [];
@@ -264,7 +268,7 @@ function totals(o) {
   const landedBRL = r2(paidBRL + pendingBRL + extrasBRL + taxForecastPendingBRL);
   return {
     cur, orate, pieces, itemsTotal: r2(itemsTotal), freight: n0(o.freight), discount: n0(o.discount), supplierExpenses: r2(supplierExpenses),
-    supplierTotal, paid, paidBRL: r2(paidBRL), pending, pendingBRL: r2(pendingBRL), payStatus, taxPaidBRL, taxAwaiting, taxForecastBRL, taxForecastPendingBRL, taxDone: !!o.taxDone, taxTotalBRL: r2(taxPaidBRL + taxIncludedBRL),
+    supplierTotal, supplierTotalBRL: r2(to(supplierTotal, cur, null, "BRL")), paid, paidBRL: r2(paidBRL), pending, pendingBRL: r2(pendingBRL), payStatus, taxPaidBRL, taxAwaiting, taxForecastBRL, taxForecastPendingBRL, taxDone: !!o.taxDone, taxTotalBRL: r2(taxPaidBRL + taxIncludedBRL),
     extrasBRL, extrasPendingBRL, landedBRL, costPerPiece: pieces > 0 ? landedBRL / pieces : null, missingRate,
   };
 }
@@ -282,7 +286,16 @@ function receipt(o) {
   else status = "parcial";
   return { status, expected, received, defective, missing: Math.max(expected - received, 0), pk, pt: trk.length };
 }
-const other = (v, cur, rate) => { const o = cur === "USD" ? "BRL" : "USD"; const c = convert(v, cur, o, rate); return c === null ? null : "≈ " + money(c, o); };
+// Valor na moeda original; se for dólar, mostra ao lado (pequeno) o valor em reais
+const toBRLv = (v, cur, rate) => (cur === "USD" ? convert(v, "USD", "BRL", rate || FALLBACK_RATE) : v);
+function M(v, cur, rate, block) {
+  if (cur !== "USD" || v === null || v === undefined) return money(v, cur);
+  const b = toBRLv(v, cur, rate);
+  return html`${money(v, "USD")}<span class=${cx("brl", block && "blk")}>${b === null ? "sem cotação" : money(b)}</span>`;
+}
+// Dica para campos digitados em dólar: "= R$ X"
+const brlHint = (val, cur, rate) => { if (cur !== "USD") return null; const v = parseDec(val); if (!v) return null; const b = toBRLv(v, "USD", rate); return b === null ? "Defina a cotação para ver em reais" : "= " + money(b); };
+const other = (v, cur, rate) => { if (cur !== "USD") return null; const c = toBRLv(v, cur, rate); return c === null ? "Sem cotação" : "= " + money(c); };
 const isLate = (o) => !!o.expectedDate && o.expectedDate < today() && !CLOSED.includes(o.status);
 function rateFor(rates, day) {
   let best = null;
@@ -411,6 +424,7 @@ function App() {
   const D = st.data;
   const t = today();
   const cur = rateFor(D.rates, t);
+  FALLBACK_RATE = cur?.usdBrl || null;
   const byId = useMemo(() => {
     const m = {};
     for (const k of ["suppliers", "products", "modes", "carriers", "methods"]) m[k] = Object.fromEntries(D[k].map((x) => [x.id, x]));
@@ -449,18 +463,19 @@ function Painel({ ctx }) {
   const { D, byId, go, setFilters, today: t, curRate } = ctx;
   const rows = D.orders.filter((o) => o.status !== "cancelado").map((o) => ({ o, t: totals(o), r: receipt(o) }));
   const open = rows.filter((x) => !CLOSED.includes(x.o.status));
-  const pend = { USD: 0, BRL: 0 }; let extras = 0, taxFc = 0; const bySup = {};
+  // Tudo somado em reais: saldo em dólar convertido pela cotação de cada pedido (ou a de hoje, se o pedido não tiver)
+  const pend = { USD: 0, BRL: 0, total: 0 }; let extras = 0, taxFc = 0; const bySup = {};
   for (const { o, t: tt } of rows) {
     extras += tt.extrasPendingBRL;
     taxFc += tt.taxForecastPendingBRL;
     if (tt.pending <= 0.01) continue;
-    pend[tt.cur] += tt.pending;
+    pend[tt.cur] += tt.pending; pend.total += tt.pendingBRL;
     const k = o.supplierId || "sem";
-    bySup[k] = bySup[k] || { id: o.supplierId, name: byId.suppliers[o.supplierId]?.name || "Sem fornecedor", USD: 0, BRL: 0 };
-    bySup[k][tt.cur] += tt.pending;
+    bySup[k] = bySup[k] || { id: o.supplierId, name: byId.suppliers[o.supplierId]?.name || "Sem fornecedor", USD: 0, BRL: 0, total: 0 };
+    bySup[k][tt.cur] += tt.pending; bySup[k].total += tt.pendingBRL;
   }
   const rate = curRate?.usdBrl || null;
-  const toBRL = (v) => v.BRL + (convert(v.USD, "USD", "BRL", rate) || 0);
+  const toBRL = (v) => v.total;
   const late = open.filter((x) => isLate(x.o));
   const soon = addDays(t, 15);
   const arriving = open.filter((x) => x.o.expectedDate && x.o.expectedDate >= t && x.o.expectedDate <= soon).sort((a, b) => (a.o.expectedDate < b.o.expectedDate ? -1 : 1));
@@ -480,7 +495,7 @@ function Painel({ ctx }) {
   return html`<${Head} title="Painel" actions=${html`<button class="btn pri" onClick=${() => go("novo")}>+ Novo pedido</button>`} />
     ${!curRate || curRate.id !== t ? html`<button class="banner b-warn" style="border:0;text-align:left;cursor:pointer;font:inherit" onClick=${() => go("dolar")}>A cotação do dólar de hoje ainda não foi definida${curRate ? " (usando a de " + fdate(curRate.id) + ")" : ""}. Toque para definir.</button>` : null}
     <div class="stats">
-      <${Stat} label="Pedidos a pagar" value=${money(toBRL(pend))} sub=${pend.USD > 0 ? [money(pend.USD, "USD"), pend.BRL > 0 ? money(pend.BRL) : null].filter(Boolean).join(" + ") : "Saldo com fornecedores"} tone=${toBRL(pend) > 0 ? "bad" : "good"} onClick=${() => toList({ pagamento: "em_aberto" })} />
+      <${Stat} label="Pedidos a pagar" value=${money(toBRL(pend))} sub=${pend.USD > 0 ? "Inclui " + money(pend.USD, "USD") + " em reais" : "Saldo com fornecedores"} tone=${toBRL(pend) > 0 ? "bad" : "good"} onClick=${() => toList({ pagamento: "em_aberto" })} />
       <${Stat} label="Impostos previstos a pagar" value=${money(taxFc)} sub=${rows.filter((x) => x.t.taxForecastPendingBRL > 0).length + " pedido(s) com previsão"} tone=${taxFc > 0 ? "warn" : null} onClick=${() => toList({ situacao: "imposto_previsto" })} />
       <${Stat} label="Total a pagar" value=${money(toBRL(pend) + taxFc)} sub="Pedidos + impostos previstos" tone=${toBRL(pend) + taxFc > 0 ? "bad" : "good"} onClick=${() => toList({ situacao: "a_pagar" })} />
       <${Stat} label="Pedidos em aberto" value=${open.length} onClick=${() => toList({ status: "abertos" })} />
@@ -492,7 +507,7 @@ function Painel({ ctx }) {
       <${Card} title=${"Atrasados (" + late.length + ")"}><${OList} list=${late} empty="Nenhum pedido atrasado." right=${(x) => html`<span style="color:var(--bad)">Previsto ${fdate(x.o.expectedDate)}</span>`} /><//>
       <${Card} title=${"Chegando em 15 dias (" + arriving.length + ")"}><${OList} list=${arriving} empty="Nenhuma chegada prevista nos próximos 15 dias." right=${(x) => fdate(x.o.expectedDate)} /><//>
       <${Card} title="A pagar por fornecedor">${Object.values(bySup).length ? html`<div class="list">${Object.values(bySup).sort((a, b) => toBRL(b) - toBRL(a)).map((s) => html`
-        <div class="li" key=${s.name} style="cursor:pointer" onClick=${() => toList({ fornecedor: s.id || "", pagamento: "em_aberto" })}><strong>${s.name}</strong><span class="tab" style="text-align:right">${s.USD > 0 ? html`<div>${money(s.USD, "USD")}</div>` : null}${s.BRL > 0 ? html`<div>${money(s.BRL)}</div>` : null}</span></div>`)}</div>` : html`<div class="empty">Nenhum saldo a pagar.</div>`}<//>
+        <div class="li" key=${s.name} style="cursor:pointer" onClick=${() => toList({ fornecedor: s.id || "", pagamento: "em_aberto" })}><strong>${s.name}</strong><span class="tab" style="text-align:right"><div>${money(s.total)}</div>${s.USD > 0 ? html`<div class="small muted">inclui ${money(s.USD, "USD")}</div>` : null}</span></div>`)}</div>` : html`<div class="empty">Nenhum saldo a pagar.</div>`}<//>
       <${Card} title=${"Precisam de atenção (" + attention.length + ")"}><${OList} list=${attention} empty="Nada pendente de revisão." right=${(x) => html`<span class="row" style="justify-content:flex-end">${x.o.needsReview ? html`<${Pill} tone="p-warn">Revisar<//>` : null}${x.t.taxAwaiting ? html`<${Pill} tone="p-acc">Imposto a lançar<//>` : null}${x.r.status === "divergencia" ? html`<${Pill} tone="p-bad">Divergência<//>` : null}</span>`} /><//>
     </div>`;
 }
@@ -541,7 +556,7 @@ const SORTS = [
 const STATUS_ORDER = Object.keys(ORDER_STATUS);
 function sortOrders(list, mode, inverted, byId, rate) {
   // Valores em dólar comparados em reais (cotação do pedido ou a de hoje)
-  const brl = (v, x) => (x.t.cur === "USD" ? v * (x.t.orate || rate || 1) : v);
+  const brl = (v, x) => (x.t.cur === "USD" ? v * (x.t.orate || 1) : v);
   const date = (d, empty) => d || empty;
   const byNumDesc = (a, b) => (b.o.number || 0) - (a.o.number || 0);
   const cmp = {
@@ -593,9 +608,8 @@ function Pedidos({ ctx }) {
   const setSort = (v) => { setSortState(v); try { localStorage.setItem("encomendas-ordem", JSON.stringify(v)); } catch (e) {} };
   const list = sortOrders(filterOrders(D, byId, f), sort.mode, sort.inv, byId, curRate?.usdBrl);
   const set = (k, v) => setFilters({ ...f, [k]: v });
-  const pend = { USD: 0, BRL: 0 }; let pieces = 0, extras = 0, taxFc = 0;
-  for (const x of list) { if (x.t.pending > 0) pend[x.t.cur] += x.t.pending; pieces += x.t.pieces; extras += x.t.extrasPendingBRL; taxFc += x.t.taxForecastPendingBRL; }
-  const pendAll = pend.BRL + (convert(pend.USD, "USD", "BRL", curRate?.usdBrl) || 0);
+  const pend = { USD: 0, BRL: 0 }; let pieces = 0, extras = 0, taxFc = 0, pendAll = 0;
+  for (const x of list) { if (x.t.pending > 0) { pend[x.t.cur] += x.t.pending; pendAll += x.t.pendingBRL; } pieces += x.t.pieces; extras += x.t.extrasPendingBRL; taxFc += x.t.taxForecastPendingBRL; }
   const has = Object.values(f).some(Boolean);
   const sel = (k, label, opts) => html`<select value=${f[k] || ""} onChange=${(e) => set(k, e.target.value)} aria-label=${label}><option value="">${label}</option>${opts.map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>`;
   return html`<${Head} title="Pedidos" actions=${html`<${ExportButton} ctx=${ctx} list=${list} /><button class="btn pri" onClick=${() => go("novo")}>+ Novo pedido</button>`} />
@@ -616,7 +630,7 @@ function Pedidos({ ctx }) {
     <div class="stats">
       <${Stat} label="Pedidos" value=${list.length} />
       <${Stat} label="Peças" value=${num(pieces, 0)} />
-      <${Stat} label="Pedidos a pagar" value=${money(pendAll)} sub=${pend.USD > 0 ? [money(pend.USD, "USD"), pend.BRL > 0 ? money(pend.BRL) : null].filter(Boolean).join(" + ") : null} tone=${pendAll > 0 ? "bad" : null} />
+      <${Stat} label="Pedidos a pagar" value=${money(pendAll)} sub=${pend.USD > 0 ? "Inclui " + money(pend.USD, "USD") + " em reais" : null} tone=${pendAll > 0 ? "bad" : null} />
       <${Stat} label="Impostos previstos a pagar" value=${money(taxFc)} tone=${taxFc > 0 ? "warn" : null} />
       <${Stat} label="Total a pagar" value=${money(pendAll + taxFc)} sub="Pedidos + impostos previstos" tone=${pendAll + taxFc > 0 ? "bad" : null} />
       <${Stat} label="Despesas pendentes" value=${money(extras)} tone="warn" />
@@ -625,7 +639,7 @@ function Pedidos({ ctx }) {
       <button type="button" key=${o.id} class=${cx("order-card", late && "late")} onClick=${() => go("pedido", { id: o.id })}>
         <div class="row between" style="align-items:flex-start"><div style="min-width:0"><div><span class="num">#${o.number}</span> <strong>${o.title}</strong></div>
           <div class="small muted">${[byId.suppliers[o.supplierId]?.name, byId.modes[o.modeId]?.name, "Pedido " + fdate(o.orderDate)].filter(Boolean).join(" · ")} · <span style=${late ? "color:var(--bad);font-weight:600" : ""}>Previsão ${fdate(o.expectedDate)}${late ? " (atrasado)" : ""}</span></div></div>
-          <div style="text-align:right"><div class="tab"><strong>${money(t.supplierTotal, t.cur)}</strong></div>${t.pending > 0.01 ? html`<div class="small tab" style="color:var(--bad)">Falta ${money(t.pending, t.cur)}</div>` : null}</div></div>
+          <div style="text-align:right"><div class="tab"><strong>${M(t.supplierTotal, t.cur, t.orate, true)}</strong></div>${t.pending > 0.01 ? html`<div class="small tab" style="color:var(--bad)">Falta ${t.cur === "USD" ? money(t.pendingBRL) + " (" + money(t.pending, "USD") + ")" : money(t.pending)}</div>` : null}</div></div>
         <div class="row"><${Pill} tone=${ORDER_TONE[o.status]}>${ORDER_STATUS[o.status]}<//><${Pill} tone=${PAY_TONE[t.payStatus]}>${PAY_LABEL[t.payStatus]}<//>${r.status !== "nao_recebido" ? html`<${Pill} tone=${REC_TONE[r.status]}>${REC_LABEL[r.status]}<//>` : null}<${Pill}>${num(t.pieces, 0)} peças<//>
           ${(o.trackings || []).length ? html`<${Pill}>${o.trackings.filter((x) => x.status === "entregue" || x.received).length}/${o.trackings.length} rastreios entregues<//>` : null}
           ${t.taxAwaiting ? html`<${Pill} tone="p-acc">Imposto a lançar<//>` : null}${o.needsReview ? html`<${Pill} tone="p-warn">Revisar<//>` : null}</div>
@@ -655,10 +669,10 @@ function ExportButton({ ctx, list }) {
       const P = [], I = [], PG = [], IM = [], R = [];
       for (const { o, t, r } of list) {
         const sup = byId.suppliers[o.supplierId]?.name || "";
-        P.push({ "Nº": o.number, "Título": o.title, "Fornecedor": sup, "Data do pedido": fdate(o.orderDate), "Previsão": fdate(o.expectedDate), "Modalidade": byId.modes[o.modeId]?.name || "", "Transportadora": byId.carriers[o.carrierId]?.name || "", "Status": ORDER_STATUS[o.status], "Moeda": cur(o.currency), "Cotação": o.rate || "", "Peças": t.pieces, "Produtos": t.itemsTotal, "Frete": t.freight, "Desconto": t.discount, "Despesas do fornecedor": t.supplierExpenses, "Total ao fornecedor": t.supplierTotal, "Pago": t.paid, "Falta pagar": t.pending, "Pagamento": PAY_LABEL[t.payStatus], "Imposto": TAX_LABEL[o.taxMode], "Imposto (R$)": t.taxTotalBRL, "Imposto previsto (R$)": t.taxForecastBRL || "", "Imposto previsto a pagar (R$)": t.taxForecastPendingBRL || "", "Imposto concluído": o.taxMode === "por_fora" ? (o.taxDone ? "Sim" : "Não") : "", "Imposto/despesas à parte (R$)": t.extrasBRL, "Custo total (R$)": t.landedBRL, "Custo por peça (R$)": t.costPerPiece ? r2(t.costPerPiece) : "", "Recebimento": REC_LABEL[r.status], "Peças recebidas": r.received, "Com defeito": r.defective, "Rastreios": (o.trackings || []).length, "Observações": o.notes || "" });
-        for (const i of o.items || []) I.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Produto": byId.products[i.productId]?.name || "", "Variação": i.variant || "", "Caixas": i.boxes ?? "", "Peças/caixa": i.ppb ?? "", "Grades": i.grids ?? "", "Peças/grade": i.ppg ?? "", "Total de peças": i.pieces, "Valor unitário": i.unitPrice, "Moeda": cur(o.currency), "Total": r2(n0(i.pieces) * n0(i.unitPrice)), "Tamanhos": i.sizes ? Object.entries(i.sizes).map(([s, q]) => s + ": " + q).join(", ") : "", "Recebido": i.receivedQty ?? "", "Com defeito": i.defectiveQty ?? "", "Obs. conferência": i.checkNotes || "" });
+        P.push({ "Nº": o.number, "Título": o.title, "Fornecedor": sup, "Data do pedido": fdate(o.orderDate), "Previsão": fdate(o.expectedDate), "Modalidade": byId.modes[o.modeId]?.name || "", "Transportadora": byId.carriers[o.carrierId]?.name || "", "Status": ORDER_STATUS[o.status], "Moeda": cur(o.currency), "Cotação": o.rate || "", "Peças": t.pieces, "Produtos": t.itemsTotal, "Frete": t.freight, "Desconto": t.discount, "Despesas do fornecedor": t.supplierExpenses, "Total ao fornecedor": t.supplierTotal, "Total ao fornecedor (R$)": t.supplierTotalBRL, "Pago": t.paid, "Pago (R$)": t.paidBRL, "Falta pagar": t.pending, "Falta pagar (R$)": t.pending > 0 ? t.pendingBRL : 0, "Pagamento": PAY_LABEL[t.payStatus], "Imposto": TAX_LABEL[o.taxMode], "Imposto (R$)": t.taxTotalBRL, "Imposto previsto (R$)": t.taxForecastBRL || "", "Imposto previsto a pagar (R$)": t.taxForecastPendingBRL || "", "Imposto concluído": o.taxMode === "por_fora" ? (o.taxDone ? "Sim" : "Não") : "", "Imposto/despesas à parte (R$)": t.extrasBRL, "Custo total (R$)": t.landedBRL, "Custo por peça (R$)": t.costPerPiece ? r2(t.costPerPiece) : "", "Recebimento": REC_LABEL[r.status], "Peças recebidas": r.received, "Com defeito": r.defective, "Rastreios": (o.trackings || []).length, "Observações": o.notes || "" });
+        for (const i of o.items || []) I.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Produto": byId.products[i.productId]?.name || "", "Variação": i.variant || "", "Caixas": i.boxes ?? "", "Peças/caixa": i.ppb ?? "", "Grades": i.grids ?? "", "Peças/grade": i.ppg ?? "", "Total de peças": i.pieces, "Valor unitário": i.unitPrice, "Moeda": cur(o.currency), "Total": r2(n0(i.pieces) * n0(i.unitPrice)), "Total (R$)": r2(convert(n0(i.pieces) * n0(i.unitPrice), o.currency || "BRL", "BRL", t.orate) || 0), "Tamanhos": i.sizes ? Object.entries(i.sizes).map(([s, q]) => s + ": " + q).join(", ") : "", "Recebido": i.receivedQty ?? "", "Com defeito": i.defectiveQty ?? "", "Obs. conferência": i.checkNotes || "" });
         for (const p of o.payments || []) PG.push({ "Nº pedido": o.number, "Pedido": o.title, "Fornecedor": sup, "Data": fdate(p.date), "Valor": p.amount, "Moeda": cur(p.currency), "Cotação": p.rate || "", "Valor em R$": r2(convert(p.amount, p.currency, "BRL", p.rate || t.orate) || 0), "Forma de pagamento": byId.methods[p.methodId]?.name || "", "Observação": p.notes || "" });
-        for (const x of o.taxPayments || []) IM.push({ "Nº pedido": o.number, "Pedido": o.title, "Data": fdate(x.date), "Valor": x.amount, "Moeda": cur(x.currency), "Cotação": x.rate || "", "Pacote": (o.trackings || []).find((k) => k.id === x.trackingId)?.code || "Pedido todo", "Observação": x.notes || "" });
+        for (const x of o.taxPayments || []) IM.push({ "Nº pedido": o.number, "Pedido": o.title, "Data": fdate(x.date), "Valor": x.amount, "Moeda": cur(x.currency), "Cotação": x.rate || "", "Valor em R$": r2(convert(x.amount, x.currency, "BRL", x.rate || t.orate) || 0), "Pacote": (o.trackings || []).find((k) => k.id === x.trackingId)?.code || "Pedido todo", "Observação": x.notes || "" });
         for (const k of o.trackings || []) R.push({ "Nº pedido": o.number, "Pedido": o.title, "Código": k.code, "Conteúdo": k.label || "", "Transportadora": byId.carriers[k.carrierId]?.name || "", "Status": TRK_STATUS[k.status], "Recebido": k.received ? "Sim" : "Não", "Data recebimento": fdate(k.receivedDate), "Observação": k.notes || "" });
       }
       const wb = X.utils.book_new();
@@ -698,6 +712,7 @@ function OrderForm({ ctx, id }) {
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const cur = f.currency;
+  const frate = parseDec(f.rate);
 
   if (id && !existing) return html`<${Head} title="Pedido não encontrado" back=${() => go("pedidos")} />`;
 
@@ -799,9 +814,9 @@ function OrderForm({ ctx, id }) {
             <${Field} label="Grades"><input id=${"g-" + i.id} inputmode="decimal" value=${i.grids} onInput=${(e) => upItem(i.id, { grids: e.target.value })} /><//>
             <${Field} label="Peças/grade"><input id=${"pg-" + i.id} inputmode="decimal" value=${i.ppg} onInput=${(e) => upItem(i.id, { ppg: e.target.value })} /><//>
             <${Field} label="Total de peças" hint=${s !== null && s !== tp ? html`<button class="link" onClick=${(e) => { e.preventDefault(); upItem(i.id, { pieces: String(s) }); }}>Calculado: ${s}. Usar</button>` : null}><input id=${"t-" + i.id} inputmode="numeric" value=${i.pieces} onInput=${(e) => upItem(i.id, { pieces: e.target.value })} style="font-weight:600" /><//>
-            <${Field} label="Valor unit."><span class="money" data-sym=${SYM(cur)}><input id=${"u-" + i.id} inputmode="decimal" value=${i.unitPrice} onInput=${(e) => upItem(i.id, { unitPrice: e.target.value })} /></span><//>
+            <${Field} label="Valor unit." hint=${brlHint(i.unitPrice, cur, frate)}><span class="money" data-sym=${SYM(cur)}><input id=${"u-" + i.id} inputmode="decimal" value=${i.unitPrice} onInput=${(e) => upItem(i.id, { unitPrice: e.target.value })} /></span><//>
           </div>
-          <div class="row between"><button class="link" onClick=${() => upItem(i.id, { sizes: i.sizes ? null : ["P", "M", "G", "GG", "XGG"].map((size) => ({ size, qty: "" })) })}>${i.sizes ? "Não controlar tamanhos" : "Controlar tamanhos (opcional)"}</button><strong class="tab">Total: ${money(tp * (parseDec(i.unitPrice) || 0), cur)}</strong></div>
+          <div class="row between"><button class="link" onClick=${() => upItem(i.id, { sizes: i.sizes ? null : ["P", "M", "G", "GG", "XGG"].map((size) => ({ size, qty: "" })) })}>${i.sizes ? "Não controlar tamanhos" : "Controlar tamanhos (opcional)"}</button><strong class="tab">Total: ${M(tp * (parseDec(i.unitPrice) || 0), cur, frate)}</strong></div>
           ${i.sizes ? html`<div class="sizes">${i.sizes.map((sz, k) => html`<div class="sz" key=${k}>
               <input list="dl-size" value=${sz.size} aria-label="Tamanho" onInput=${(e) => upItem(i.id, { sizes: i.sizes.map((x, j) => (j === k ? { ...x, size: e.target.value } : x)) })} />
               <input inputmode="numeric" placeholder="qtd" value=${sz.qty} aria-label="Quantidade" onInput=${(e) => upItem(i.id, { sizes: i.sizes.map((x, j) => (j === k ? { ...x, qty: e.target.value } : x)) })} /></div>`)}
@@ -814,11 +829,11 @@ function OrderForm({ ctx, id }) {
 
     <${Card} title="Frete, desconto e imposto">
       <div class="grid g2">
-        <${Field} label="Frete"><span class="money" data-sym=${SYM(cur)}><input id="f-fr" inputmode="decimal" value=${f.freight} onInput=${(e) => set("freight", e.target.value)} /></span><//>
-        <${Field} label="Desconto"><span class="money" data-sym=${SYM(cur)}><input id="f-ds" inputmode="decimal" value=${f.discount} onInput=${(e) => set("discount", e.target.value)} /></span><//>
+        <${Field} label="Frete" hint=${brlHint(f.freight, cur, frate)}><span class="money" data-sym=${SYM(cur)}><input id="f-fr" inputmode="decimal" value=${f.freight} onInput=${(e) => set("freight", e.target.value)} /></span><//>
+        <${Field} label="Desconto" hint=${brlHint(f.discount, cur, frate)}><span class="money" data-sym=${SYM(cur)}><input id="f-ds" inputmode="decimal" value=${f.discount} onInput=${(e) => set("discount", e.target.value)} /></span><//>
       </div>
       <div class="radios">${Object.keys(TAX_LABEL).map((m) => html`<label key=${m} class=${cx("radio", f.taxMode === m && "on")}><input type="radio" name="taxMode" checked=${f.taxMode === m} onChange=${() => set("taxMode", m)} /><span><strong>${TAX_LABEL[m]}</strong><div class="small muted">${TAX_HINT[m]}</div></span></label>`)}</div>
-      ${f.taxMode === "incluso" ? html`<${Field} label="Valor do imposto incluso — opcional"><span class="money" data-sym=${SYM(cur)}><input id="f-tx" inputmode="decimal" value=${f.taxAmount} onInput=${(e) => set("taxAmount", e.target.value)} /></span><//>` : null}
+      ${f.taxMode === "incluso" ? html`<${Field} label="Valor do imposto incluso — opcional" hint=${brlHint(f.taxAmount, cur, frate)}><span class="money" data-sym=${SYM(cur)}><input id="f-tx" inputmode="decimal" value=${f.taxAmount} onInput=${(e) => set("taxAmount", e.target.value)} /></span><//>` : null}
       ${f.taxMode === "por_fora" ? html`<div class="grid g2">
         <${Field} label="Imposto previsto — opcional" hint="Quanto você espera pagar de imposto. Entra no painel como imposto a pagar até você marcar o imposto como concluído."><span class="money" data-sym="R$"><input id="f-txf" inputmode="decimal" value=${f.taxForecast} onInput=${(e) => set("taxForecast", e.target.value)} placeholder="0,00" /></span><//>
       </div>` : null}
@@ -828,7 +843,7 @@ function OrderForm({ ctx, id }) {
       ${expenses.length === 0 ? html`<p class="muted small" style="margin:0">Taxas, envio interno, despachante etc. Nenhuma despesa lançada.</p>` : expenses.map((e) => html`<div class="itembox" key=${e.id}>
         <div class="grid g2">
           <${Field} label="Descrição"><input value=${e.description} onInput=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, description: ev.target.value } : x)))} /><//>
-          <${Field} label="Valor"><span class="money" data-sym=${SYM(e.currency)}><input inputmode="decimal" value=${e.amount} onInput=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, amount: ev.target.value } : x)))} /></span><//>
+          <${Field} label="Valor" hint=${brlHint(e.amount, e.currency, frate)}><span class="money" data-sym=${SYM(e.currency)}><input inputmode="decimal" value=${e.amount} onInput=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, amount: ev.target.value } : x)))} /></span><//>
           <${Field} label="Moeda"><select value=${e.currency} onChange=${(ev) => setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, currency: ev.target.value } : x)))}><option value="BRL">R$</option><option value="USD">$</option></select><//>
         </div>
         <div class="row between"><div class="row">
@@ -846,7 +861,7 @@ function OrderForm({ ctx, id }) {
     <div class="sticky-foot">
       <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
         <div><div class="small muted">Peças</div><strong class="tab">${num(tot.pieces, 0)}</strong></div>
-        <div><div class="small muted">Produtos</div><strong class="tab">${money(tot.itemsTotal, cur)}</strong></div>
+        <div><div class="small muted">Produtos</div><strong class="tab">${M(tot.itemsTotal, cur, tot.orate, true)}</strong></div>
         <div><div class="small muted">Total ao fornecedor</div><strong class="tab" style="color:var(--accent)">${money(tot.supplierTotal, cur)}</strong><div class="small muted">${other(tot.supplierTotal, cur, tot.orate) || ""}</div></div>
         <div><div class="small muted">Despesas à parte</div><strong class="tab">${money(tot.extrasBRL)}</strong></div>
         ${tot.taxForecastBRL > 0 ? html`<div><div class="small muted">Imposto previsto</div><strong class="tab">${money(tot.taxForecastBRL)}</strong></div>` : null}
@@ -882,7 +897,7 @@ function OrderDetail({ ctx, id }) {
     <${Card} title="Financeiro">
       <div class="stats">
         <${Stat} label="Total ao fornecedor" value=${money(tt.supplierTotal, cur)} sub=${other(tt.supplierTotal, cur, tt.orate)} />
-        <${Stat} label="Já pago" value=${money(tt.paid, cur)} sub=${money(tt.paidBRL) + " efetivos"} tone="good" />
+        <${Stat} label="Já pago" value=${money(tt.paid, cur)} sub=${cur === "USD" ? "= " + money(tt.paidBRL) + " (cotação de cada pagamento)" : null} tone="good" />
         <${Stat} label="Falta pagar" value=${money(Math.max(tt.pending, 0), cur)} sub=${tt.pending < 0 ? "Pago a mais: " + money(-tt.pending, cur) : other(Math.max(tt.pending, 0), cur, tt.orate)} tone=${tt.pending > 0.01 ? "bad" : "good"} />
         <${Stat} label="Imposto e despesas à parte" value=${money(tt.extrasBRL)} sub=${tt.extrasPendingBRL > 0 ? "Despesas pendentes: " + money(tt.extrasPendingBRL) : tt.taxAwaiting ? "Imposto por fora ainda não lançado" : "Nada pendente"} tone=${tt.extrasPendingBRL > 0 || tt.taxAwaiting ? "warn" : null} />
         <${Stat} label="Imposto" value=${o.taxMode === "sem" && tt.taxTotalBRL === 0 ? "Sem imposto" : money(tt.taxTotalBRL)} sub=${tt.taxForecastBRL > 0 ? "Previsto " + money(tt.taxForecastBRL) + (tt.taxDone ? " · concluído" : "") : TAX_LABEL[o.taxMode]} tone=${tt.taxForecastPendingBRL > 0 ? "warn" : null} />
@@ -890,12 +905,12 @@ function OrderDetail({ ctx, id }) {
         <${Stat} label="Custo real por peça" value=${tt.costPerPiece !== null ? money(tt.costPerPiece) : "—"} sub="Com frete, imposto e despesas" />
       </div>
       <table class="tab"><tbody>
-        <tr><td>Produtos</td><td class="r">${money(tt.itemsTotal, cur)}</td></tr><tr><td>Frete</td><td class="r">${money(tt.freight, cur)}</td></tr>
-        <tr><td>Desconto</td><td class="r">− ${money(tt.discount, cur)}</td></tr>${tt.supplierExpenses > 0 ? html`<tr><td>Despesas cobradas pelo fornecedor</td><td class="r">${money(tt.supplierExpenses, cur)}</td></tr>` : null}
-        <tr><td><strong>Total ao fornecedor</strong></td><td class="r"><strong>${money(tt.supplierTotal, cur)}</strong></td></tr></tbody></table>
+        <tr><td>Produtos</td><td class="r">${M(tt.itemsTotal, cur, tt.orate, true)}</td></tr><tr><td>Frete</td><td class="r">${M(tt.freight, cur, tt.orate, true)}</td></tr>
+        <tr><td>Desconto</td><td class="r">− ${M(tt.discount, cur, tt.orate, true)}</td></tr>${tt.supplierExpenses > 0 ? html`<tr><td>Despesas cobradas pelo fornecedor</td><td class="r">${M(tt.supplierExpenses, cur, tt.orate, true)}</td></tr>` : null}
+        <tr><td><strong>Total ao fornecedor</strong></td><td class="r"><strong>${M(tt.supplierTotal, cur, tt.orate, true)}</strong></td></tr></tbody></table>
       ${(o.expenses || []).length ? html`<div><div class="small muted" style="font-weight:600;margin-bottom:4px">OUTRAS DESPESAS</div><div class="list">${o.expenses.map((e) => html`<div class="li" key=${e.id}>
         <span>${e.description} <span class="small muted">${e.chargedBySupplier ? "(cobrada pelo fornecedor)" : e.paid ? "(paga)" : "(pendente)"}</span></span>
-        <span class="row"><strong class="tab">${money(e.amount, e.currency)}</strong>${!e.chargedBySupplier && canWrite ? html`<button class="btn sm" onClick=${() => patch({ expenses: o.expenses.map((x) => (x.id === e.id ? { ...x, paid: !x.paid } : x)) })}>${e.paid ? "Desmarcar pago" : "Marcar pago"}</button>` : null}</span></div>`)}</div></div>` : null}
+        <span class="row"><strong class="tab">${M(e.amount, e.currency, tt.orate)}</strong>${!e.chargedBySupplier && canWrite ? html`<button class="btn sm" onClick=${() => patch({ expenses: o.expenses.map((x) => (x.id === e.id ? { ...x, paid: !x.paid } : x)) })}>${e.paid ? "Desmarcar pago" : "Marcar pago"}</button>` : null}</span></div>`)}</div></div>` : null}
     <//>
 
     <${Payments} ctx=${ctx} o=${o} tt=${tt} patch=${patch} />
@@ -907,8 +922,8 @@ function OrderDetail({ ctx, id }) {
         ${i.sizes ? html`<div class="row" style="margin-top:4px">${Object.entries(i.sizes).map(([s, q]) => html`<${Pill} key=${s}>${s}: ${q}<//>`)}</div>` : null}</td>
         <td class="r">${i.boxes ? num(i.boxes) : "—"}</td><td class="r">${i.grids ? num(i.grids) : "—"}</td><td class="r"><strong>${num(i.pieces, 0)}</strong></td>
         <td class="r" style=${i.receivedQty == null ? "color:var(--muted)" : i.receivedQty === i.pieces && !i.defectiveQty ? "color:var(--good)" : "color:var(--warn)"}>${i.receivedQty == null ? "—" : num(i.receivedQty, 0)}${i.defectiveQty ? html`<div class="small" style="color:var(--bad)">${i.defectiveQty} def.</div>` : null}</td>
-        <td class="r">${money(i.unitPrice, cur)}</td><td class="r"><strong>${money(n0(i.pieces) * n0(i.unitPrice), cur)}</strong></td></tr>`)}
-      <tr><td><strong>Total</strong></td><td></td><td></td><td class="r"><strong>${num(tt.pieces, 0)}</strong></td><td class="r">${r.received ? num(r.received, 0) : "—"}</td><td></td><td class="r"><strong>${money(tt.itemsTotal, cur)}</strong></td></tr>
+        <td class="r">${M(i.unitPrice, cur, tt.orate, true)}</td><td class="r"><strong>${M(n0(i.pieces) * n0(i.unitPrice), cur, tt.orate, true)}</strong></td></tr>`)}
+      <tr><td><strong>Total</strong></td><td></td><td></td><td class="r"><strong>${num(tt.pieces, 0)}</strong></td><td class="r">${r.received ? num(r.received, 0) : "—"}</td><td></td><td class="r"><strong>${M(tt.itemsTotal, cur, tt.orate, true)}</strong></td></tr>
       </tbody></table></div>
     <//>
 
@@ -970,7 +985,7 @@ function Payments({ ctx, o, tt, patch }) {
   return html`<${Card} title=${"Pagamentos ao fornecedor (" + pays.length + ")"}>
     ${pays.length === 0 ? html`<div class="empty">Nenhum pagamento lançado.</div>` : html`<div class="list">${pays.map((p) => {
       const inOrder = convert(p.amount, p.currency, o.currency, p.rate || tt.orate);
-      return html`<div class="li" key=${p.id} style=${editId === p.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(p.date)} · ${money(p.amount, p.currency)}</strong>${p.currency !== o.currency && inOrder !== null ? html` <span class="muted">(${money(inOrder, o.currency)})</span>` : null}
+      return html`<div class="li" key=${p.id} style=${editId === p.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(p.date)} · ${M(p.amount, p.currency, p.rate || tt.orate)}</strong>${p.currency !== o.currency && inOrder !== null ? html` <span class="muted">(${money(inOrder, o.currency)})</span>` : null}
         <div class="small muted">${[byId.methods[p.methodId]?.name, p.rate ? "cotação " + money(p.rate) : null, p.notes].filter(Boolean).join(" · ")}</div></div>
         <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(p)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === p.id) reset(); patch({ payments: o.payments.filter((x) => x.id !== p.id) }, "Pagamento excluído."); }} />` : null}</span></div>`;
     })}</div>`}
@@ -979,7 +994,7 @@ function Payments({ ctx, o, tt, patch }) {
       <datalist id="dl-met">${D.methods.map((m) => html`<option key=${m.id} value=${m.name} />`)}</datalist>
       <div class="grid g2">
         <${Field} label="Data"><input type="date" value=${date} onChange=${(e) => { setDate(e.target.value); const rr = rateFor(D.rates, e.target.value); if (rr) setRate(toInput(rr.usdBrl)); }} /><//>
-        <${Field} label="Valor pago"><span class="money" data-sym=${SYM(currency)}><input inputmode="decimal" value=${amount} placeholder=${tt.pending > 0 ? toInput(tt.pending) : ""} onInput=${(e) => setAmount(e.target.value)} /></span><//>
+        <${Field} label="Valor pago" hint=${brlHint(amount, currency, parseDec(rate))}><span class="money" data-sym=${SYM(currency)}><input inputmode="decimal" value=${amount} placeholder=${tt.pending > 0 ? toInput(tt.pending) : ""} onInput=${(e) => setAmount(e.target.value)} /></span><//>
         <${Field} label="Moeda"><select value=${currency} onChange=${(e) => setCurrency(e.target.value)}><option value="BRL">R$</option><option value="USD">$</option></select><//>
         <${Field} label="Cotação ($1 =)"><span class="money" data-sym="R$"><input inputmode="decimal" value=${rate} onInput=${(e) => setRate(e.target.value)} /></span><//>
         <${Field} label="Forma de pagamento"><input list="dl-met" value=${method} onInput=${(e) => setMethod(e.target.value)} placeholder="PIX, Wise..." /><//>
@@ -1042,7 +1057,7 @@ function Taxes({ ctx, o, tt, patch }) {
   const list = o.taxPayments || [];
   return html`<${Card} title="Imposto">
     <div><strong>${TAX_LABEL[o.taxMode]}</strong> <span class="muted">— ${TAX_HINT[o.taxMode]}</span></div>
-    ${o.taxMode === "incluso" && o.taxAmount > 0 ? html`<div>Valor incluso: <strong>${money(o.taxAmount, o.currency)}</strong> <span class="muted">${other(o.taxAmount, o.currency, tt.orate) || ""}</span></div>` : null}
+    ${o.taxMode === "incluso" && o.taxAmount > 0 ? html`<div>Valor incluso: <strong>${M(o.taxAmount, o.currency, tt.orate)}</strong></div>` : null}
     ${o.taxMode === "por_fora" ? html`<div style="background:var(--surface-2);border-radius:8px;padding:12px;display:grid;gap:8px">
       <div class="row between"><strong>Previsão × real</strong>${tt.taxDone ? html`<${Pill} tone="p-good">Imposto concluído<//>` : tt.taxForecastPendingBRL > 0 ? html`<${Pill} tone="p-warn">Falta ${money(tt.taxForecastPendingBRL)} (previsto)<//>` : null}</div>
       ${fcEdit ? html`<div class="row" style="align-items:flex-end">
@@ -1055,14 +1070,14 @@ function Taxes({ ctx, o, tt, patch }) {
     </div>` : null}
     ${tt.taxAwaiting ? html`<div class="banner b-warn">Imposto por fora ainda não lançado. Quando pagar, lance abaixo.</div>` : null}
     ${o.taxMode !== "incluso" ? html`
-      ${list.length ? html`<div class="list">${list.map((x) => html`<div class="li" key=${x.id} style=${editId === x.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(x.date)} · ${money(x.amount, x.currency)}</strong>
+      ${list.length ? html`<div class="list">${list.map((x) => html`<div class="li" key=${x.id} style=${editId === x.id ? "background:var(--accent-soft);border-radius:6px" : ""}><div><strong class="tab">${fdate(x.date)} · ${M(x.amount, x.currency, x.rate || tt.orate)}</strong>
         <div class="small muted">${[(o.trackings || []).find((k) => k.id === x.trackingId) ? "Pacote " + o.trackings.find((k) => k.id === x.trackingId).code : "Pedido todo", x.rate ? "cotação " + money(x.rate) : null, x.notes].filter(Boolean).join(" · ")}</div></div>
         <span class="row">${canWrite ? html`<button class="btn sm" onClick=${() => startEdit(x)}>Editar</button>` : null}${isAdmin ? html`<${Confirm} small onConfirm=${() => { if (editId === x.id) reset(); patch({ taxPayments: list.filter((y) => y.id !== x.id) }, "Lançamento excluído."); }} />` : null}</span></div>`)}
         <div class="li"><strong>Total de imposto pago</strong><strong class="tab">${money(tt.taxPaidBRL)}</strong></div></div>` : null}
       ${canWrite ? html`<details ref=${formRef} open=${open} onToggle=${(e) => setOpen(e.target.open)} style=${"background:var(--surface-2);border-radius:8px;padding:12px" + (editId ? ";outline:2px solid var(--accent)" : "")}><summary>${editId ? "Editar imposto pago" : "Lançar imposto pago"}</summary>
         <div class="grid g2" style="margin-top:10px">
           <${Field} label="Data do pagamento"><input type="date" value=${date} onChange=${(e) => { setDate(e.target.value); const rr = rateFor(D.rates, e.target.value); if (rr) setRate(toInput(rr.usdBrl)); }} /><//>
-          <${Field} label="Valor pago"><span class="money" data-sym=${SYM(currency)}><input inputmode="decimal" value=${amount} onInput=${(e) => setAmount(e.target.value)} /></span><//>
+          <${Field} label="Valor pago" hint=${brlHint(amount, currency, parseDec(rate))}><span class="money" data-sym=${SYM(currency)}><input inputmode="decimal" value=${amount} onInput=${(e) => setAmount(e.target.value)} /></span><//>
           <${Field} label="Moeda"><select value=${currency} onChange=${(e) => setCurrency(e.target.value)}><option value="BRL">R$</option><option value="USD">$</option></select><//>
           ${currency === "USD" ? html`<${Field} label="Cotação ($1 =)"><span class="money" data-sym="R$"><input inputmode="decimal" value=${rate} onInput=${(e) => setRate(e.target.value)} /></span><//>` : null}
           <${Field} label="Referente a"><select value=${trk} onChange=${(e) => setTrk(e.target.value)}><option value="">Pedido todo</option>${(o.trackings || []).map((k) => html`<option key=${k.id} value=${k.id}>Pacote ${k.code}${k.label ? " (" + k.label + ")" : ""}</option>`)}</select><//>
