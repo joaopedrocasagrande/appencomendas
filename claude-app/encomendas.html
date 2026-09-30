@@ -507,12 +507,12 @@ function Painel({ ctx }) {
   const rows = D.orders.filter((o) => o.status !== "cancelado").map((o) => ({ o, t: totals(o), r: receipt(o) }));
   const open = rows.filter((x) => !CLOSED.includes(x.o.status));
   // Tudo somado em reais: saldo em dólar convertido pela cotação de cada pedido (ou a de hoje, se o pedido não tiver)
-  const pend = { USD: 0, BRL: 0, total: 0 }; let extras = 0, taxFc = 0; const bySup = {};
+  const pend = { USD: 0, BRL: 0, total: 0, usdBRL: 0 }; let extras = 0, taxFc = 0; const bySup = {};
   for (const { o, t: tt } of rows) {
     extras += tt.extrasPendingBRL;
     taxFc += tt.taxForecastPendingBRL;
     if (tt.pending <= 0.01) continue;
-    pend[tt.cur] += tt.pending; pend.total += tt.pendingBRL;
+    pend[tt.cur] += tt.pending; pend.total += tt.pendingBRL; if (tt.cur === "USD") pend.usdBRL += tt.pendingBRL;
     const k = o.supplierId || "sem";
     bySup[k] = bySup[k] || { id: o.supplierId, name: byId.suppliers[o.supplierId]?.name || "Sem fornecedor", USD: 0, BRL: 0, total: 0 };
     bySup[k][tt.cur] += tt.pending; bySup[k].total += tt.pendingBRL;
@@ -538,7 +538,7 @@ function Painel({ ctx }) {
   return html`<${Head} title="Painel" actions=${html`<button class="btn pri" onClick=${() => go("novo")}>+ Novo pedido</button>`} />
     ${!curRate || curRate.id !== t ? html`<button class="banner b-warn" style="border:0;text-align:left;cursor:pointer;font:inherit" onClick=${() => go("dolar")}>A cotação do dólar de hoje ainda não foi definida${curRate ? " (usando a de " + fdate(curRate.id) + ")" : ""}. Toque para definir.</button>` : null}
     <div class="stats">
-      <${Stat} label="Pedidos a pagar" value=${money(toBRL(pend))} sub=${pend.USD > 0 ? "Inclui " + money(pend.USD, "USD") + " em reais" : "Saldo com fornecedores"} tone=${toBRL(pend) > 0 ? "bad" : "good"} onClick=${() => toList({ pagamento: "em_aberto" })} />
+      <${Stat} label="Pedidos a pagar" value=${money(toBRL(pend))} sub=${pend.USD > 0 ? "Inclui " + money(pend.USD, "USD") + " de pedidos em dólar (= " + money(pend.usdBRL) + ")" : "Saldo com fornecedores"} tone=${toBRL(pend) > 0 ? "bad" : "good"} onClick=${() => toList({ pagamento: "em_aberto" })} />
       <${Stat} label="Impostos previstos a pagar" value=${money(taxFc)} sub=${rows.filter((x) => x.t.taxForecastPendingBRL > 0).length + " pedido(s) com previsão"} tone=${taxFc > 0 ? "warn" : null} onClick=${() => toList({ situacao: "imposto_previsto" })} />
       <${Stat} label="Total a pagar" value=${money(toBRL(pend) + taxFc)} sub="Pedidos + impostos previstos" tone=${toBRL(pend) + taxFc > 0 ? "bad" : "good"} onClick=${() => toList({ situacao: "a_pagar" })} />
       <${Stat} label="Pedidos em aberto" value=${open.length} onClick=${() => toList({ status: "abertos" })} />
@@ -651,8 +651,8 @@ function Pedidos({ ctx }) {
   const setSort = (v) => { setSortState(v); try { localStorage.setItem("encomendas-ordem", JSON.stringify(v)); } catch (e) {} };
   const list = sortOrders(filterOrders(D, byId, f), sort.mode, sort.inv, byId, curRate?.usdBrl);
   const set = (k, v) => setFilters({ ...f, [k]: v });
-  const pend = { USD: 0, BRL: 0 }; let pieces = 0, extras = 0, taxFc = 0, pendAll = 0;
-  for (const x of list) { if (x.t.pending > 0) { pend[x.t.cur] += x.t.pending; pendAll += x.t.pendingBRL; } pieces += x.t.pieces; extras += x.t.extrasPendingBRL; taxFc += x.t.taxForecastPendingBRL; }
+  const pend = { USD: 0, BRL: 0, usdBRL: 0 }; let pieces = 0, extras = 0, taxFc = 0, pendAll = 0;
+  for (const x of list) { if (x.t.pending > 0) { pend[x.t.cur] += x.t.pending; pendAll += x.t.pendingBRL; if (x.t.cur === "USD") pend.usdBRL += x.t.pendingBRL; } pieces += x.t.pieces; extras += x.t.extrasPendingBRL; taxFc += x.t.taxForecastPendingBRL; }
   const has = Object.values(f).some(Boolean);
   const sel = (k, label, opts) => html`<select value=${f[k] || ""} onChange=${(e) => set(k, e.target.value)} aria-label=${label}><option value="">${label}</option>${opts.map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>`;
   return html`<${Head} title="Pedidos" actions=${html`<${ExportButton} ctx=${ctx} list=${list} /><button class="btn pri" onClick=${() => go("novo")}>+ Novo pedido</button>`} />
@@ -673,7 +673,7 @@ function Pedidos({ ctx }) {
     <div class="stats">
       <${Stat} label="Pedidos" value=${list.length} />
       <${Stat} label="Peças" value=${num(pieces, 0)} />
-      <${Stat} label="Pedidos a pagar" value=${money(pendAll)} sub=${pend.USD > 0 ? "Inclui " + money(pend.USD, "USD") + " em reais" : null} tone=${pendAll > 0 ? "bad" : null} />
+      <${Stat} label="Pedidos a pagar" value=${money(pendAll)} sub=${pend.USD > 0 ? "Inclui " + money(pend.USD, "USD") + " de pedidos em dólar (= " + money(pend.usdBRL) + ")" : null} tone=${pendAll > 0 ? "bad" : null} />
       <${Stat} label="Impostos previstos a pagar" value=${money(taxFc)} tone=${taxFc > 0 ? "warn" : null} />
       <${Stat} label="Total a pagar" value=${money(pendAll + taxFc)} sub="Pedidos + impostos previstos" tone=${pendAll + taxFc > 0 ? "bad" : null} />
       <${Stat} label="Despesas pendentes" value=${money(extras)} tone="warn" />
