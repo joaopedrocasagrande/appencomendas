@@ -60,8 +60,8 @@ header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; 
 nav.desk { display: none; gap: 2px; }
 nav.desk button { background: none; border: 0; padding: 7px 12px; border-radius: 8px; color: var(--muted); font: 500 .92rem var(--font-body); cursor: pointer; }
 nav.desk button.on { background: var(--accent-soft); color: var(--accent); }
-nav.mob { position: fixed; inset: auto 0 0 0; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
-nav.mob button { background: none; border: 0; padding: 9px 2px 8px; font: 500 .72rem var(--font-body); color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
+nav.mob { position: fixed; inset: auto 0 0 0; z-index: 20; display: grid; grid-template-columns: repeat(6, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+nav.mob button { background: none; border: 0; padding: 9px 1px 8px; font: 500 .68rem var(--font-body); color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
 nav.mob button.on { color: var(--accent); }
 nav.mob svg { width: 21px; height: 21px; }
 @media (min-width: 820px) { nav.desk { display: flex; } nav.mob { display: none; } main.page { padding-bottom: 40px; } }
@@ -161,6 +161,11 @@ div.f { display: grid; gap: 4px; }
 .linkish { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; min-width: 0; }
 .price-li { align-items: center; gap: 12px; }
 .price-v { text-align: right; flex-shrink: 0; margin-left: auto; }
+.trk-li { align-items: center; flex-wrap: wrap; }
+.trk-info { flex: 1 1 280px; min-width: 0; }
+.trk-act { gap: 6px; flex-wrap: nowrap; margin-left: auto; }
+.trk-act select { width: auto; max-width: 190px; padding: 6px 8px; font-size: .85rem; }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .price-item { padding: 12px 0; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
 .price-item:last-child { border-bottom: 0; }
 .costbox { background: var(--surface-2); border-radius: 8px; padding: 8px 12px; display: grid; gap: 2px; max-width: 420px; }
@@ -559,12 +564,13 @@ const ICONS = {
   pedidos: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>`,
   novo: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>`,
   dolar: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M16.5 7.5c-.8-1.2-2.4-2-4.5-2-2.6 0-4.3 1.3-4.3 3.1 0 4.4 9 2.4 9 6.9 0 1.9-1.9 3.2-4.7 3.2-2.3 0-4-.9-4.8-2.2"/></svg>`,
+  rastreios: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6h13v10H1zM14 10h4l3 3v3h-7z"/><circle cx="5.5" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg>`,
   precos: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/></svg>`,
   analises: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>`,
   cadastros: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>`,
 };
 // "Novo" e "Dólar" continuam existindo, só não aparecem no menu (Novo: botão "+ Novo pedido"; Dólar: fora da navegação por enquanto)
-const NAV = [["painel", "Painel"], ["pedidos", "Pedidos"], ["precos", "Preços"], ["analises", "Análises"], ["cadastros", "Cadastros"]];
+const NAV = [["painel", "Painel"], ["pedidos", "Pedidos"], ["rastreios", "Rastreios"], ["precos", "Preços"], ["analises", "Análises"], ["cadastros", "Cadastros"]];
 
 // ---------------- App ----------------
 function App() {
@@ -597,6 +603,7 @@ function App() {
   else if (view.name === "pedidos") page = html`<${Pedidos} ctx=${ctx} />`;
   else if (view.name === "novo") page = html`<${OrderForm} key=${"novo" + (view.from || "")} ctx=${ctx} from=${view.from} />`;
   else if (view.name === "precos") page = html`<${Precos} ctx=${ctx} />`;
+  else if (view.name === "rastreios") page = html`<${Rastreios} ctx=${ctx} />`;
   else if (view.name === "analises") page = html`<${Analises} ctx=${ctx} />`;
   else if (view.name === "editar") page = html`<${OrderForm} key=${"e" + view.id} ctx=${ctx} id=${view.id} />`;
   else if (view.name === "pedido") page = html`<${OrderDetail} ctx=${ctx} id=${view.id} />`;
@@ -1685,6 +1692,79 @@ function Precos({ ctx }) {
       </div>
     <//>
     ${body}`;
+}
+
+// ---------------- Rastreios (todos os pacotes numa tela) ----------------
+// O 17TRACK aceita vários códigos de uma vez (até 40 por consulta): um clique abre todos.
+const TRACK_BATCH = 40;
+const multiTrackLink = (codes) => "https://t.17track.net/pt#nums=" + codes.map((c) => encodeURIComponent(c.trim())).join(",");
+const TRK_PRIORITY = ["aguardando_pagamento", "fiscalizacao", "saiu_entrega", "em_transito", "postado", "aguardando_postagem", "devolvido", "extraviado", "entregue"];
+function Rastreios({ ctx }) {
+  const { D, byId, api, go, canWrite, notify, today: t } = ctx;
+  const [scope, setScope] = useState("caminho");
+  const [st, setSt] = useState("");
+  const [q, setQ] = useState("");
+  const [copied, setCopied] = useState(false);
+  const all = [];
+  for (const o of D.orders) {
+    if (o.status === "cancelado") continue;
+    for (const k of o.trackings || []) all.push({ o, k, days: k.statusAt ? daysBetween(k.statusAt.slice(0, 10), t) : null });
+  }
+  const kq = key(q);
+  const list = all.filter(({ o, k }) => (scope === "todos" || (scope === "caminho" ? !k.received : k.received))
+      && (!st || (st === "alfandega" ? ["fiscalizacao", "aguardando_pagamento"].includes(k.status) : st === "parados" ? !k.received && k.statusAt && daysBetween(k.statusAt.slice(0, 10), t) >= 10 : k.status === st))
+      && (!kq || key([k.code, k.label, o.title, "#" + o.number, byId.suppliers[o.supplierId]?.name, byId.carriers[k.carrierId || o.carrierId]?.name].join(" ")).includes(kq)))
+    .sort((a, b) => (TRK_PRIORITY.indexOf(a.k.status) - TRK_PRIORITY.indexOf(b.k.status)) || (a.o.expectedDate || "9999").localeCompare(b.o.expectedDate || "9999") || a.k.code.localeCompare(b.k.code));
+  const codes = [...new Set(list.map((x) => x.k.code))];
+  const batches = [];
+  for (let i = 0; i < codes.length; i += TRACK_BATCH) batches.push(codes.slice(i, i + TRACK_BATCH));
+  const open = all.filter((x) => !x.k.received);
+  const count = (f) => open.filter(f).length;
+
+  async function update(o, k, patch, msg) {
+    try {
+      const cur = D.orders.find((x) => x.id === o.id) || o;
+      await api.patchOrder(o.id, { trackings: (cur.trackings || []).map((x) => (x.id === k.id ? { ...x, ...patch } : x)) });
+      notify(msg);
+    } catch (e) { console.error(e); notify("Não foi possível salvar. Tente de novo."); }
+  }
+  async function copyAll() {
+    try { await navigator.clipboard.writeText(codes.join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch (e) { notify("Não foi possível copiar. Selecione os códigos na lista."); }
+  }
+
+  return html`<${Head} title="Rastreios" />
+    <div class="stats">
+      <${Stat} label="A caminho" value=${open.length} onClick=${() => { setScope("caminho"); setSt(""); }} />
+      <${Stat} label="Fiscalização / pagar imposto" value=${count((x) => ["fiscalizacao", "aguardando_pagamento"].includes(x.k.status))} tone=${count((x) => ["fiscalizacao", "aguardando_pagamento"].includes(x.k.status)) ? "warn" : null} onClick=${() => { setScope("caminho"); setSt("alfandega"); }} />
+      <${Stat} label="Parados há 10+ dias" value=${count((x) => x.days !== null && x.days >= 10)} tone=${count((x) => x.days !== null && x.days >= 10) ? "bad" : null} onClick=${() => { setScope("caminho"); setSt("parados"); }} />
+      <${Stat} label="Recebidos" value=${all.length - open.length} onClick=${() => { setScope("recebidos"); setSt(""); }} />
+    </div>
+    <${Card} title="Rastrear">
+      ${codes.length ? html`<div class="row">
+          ${batches.map((b, i) => html`<a key=${i} class="btn pri" id=${i === 0 ? "track-all" : null} href=${multiTrackLink(b)} target="_blank" rel="noopener">🔎 ${batches.length > 1 ? "Rastrear " + (i * TRACK_BATCH + 1) + "–" + (i * TRACK_BATCH + b.length) : "Rastrear todos (" + b.length + ")"}</a>`)}
+          <button class="btn" onClick=${copyAll}>${copied ? "Copiado ✓" : "Copiar códigos"}</button>
+        </div>
+        <p class="small muted" style="margin:0">Abre o 17TRACK com todos os códigos desta lista de uma vez${batches.length > 1 ? " (ele aceita até 40 por vez)" : ""}. Depois atualize o status aqui embaixo.</p>`
+        : html`<div class="empty">Nenhum rastreio nesta lista.</div>`}
+      <input id="tq" placeholder="Buscar código, pedido, fornecedor ou transportadora" value=${q} onInput=${(e) => setQ(e.target.value)} />
+      <div class="row">
+        <div class="seg">${[["caminho", "A caminho"], ["recebidos", "Recebidos"], ["todos", "Todos"]].map(([v, l]) => html`<button key=${v} class=${scope === v ? "on" : ""} onClick=${() => setScope(v)}>${l}</button>`)}</div>
+        <select value=${st} onChange=${(e) => setSt(e.target.value)} style="width:auto"><option value="">Todos os status</option><option value="alfandega">Fiscalização ou pagar imposto</option><option value="parados">Parados há 10+ dias</option>${Object.entries(TRK_STATUS).map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>
+      </div>
+    <//>
+    ${list.length ? html`<div class="card"><div class="cb"><div class="list">${list.map(({ o, k, days }) => html`<div class="li trk-li" key=${o.id + k.id}>
+      <div class="trk-info">
+        <div class="row" style="gap:8px"><a class="mono" href=${trackingLink(k.code, byId.carriers[k.carrierId])} target="_blank" rel="noopener">${k.code}</a><${Pill} tone=${TRK_TONE[k.status]}>${TRK_STATUS[k.status] || k.status}<//>${k.received ? html`<${Pill} tone="p-good">Recebido ${fdate(k.receivedDate)}<//>` : null}</div>
+        <div class="small muted"><button class="link" onClick=${() => go("pedido", { id: o.id })}>#${o.number} ${o.title}</button>${[byId.suppliers[o.supplierId]?.name, byId.carriers[k.carrierId || o.carrierId]?.name, k.label, o.expectedDate ? "previsão " + fdate(o.expectedDate) : null].filter(Boolean).map((x) => " · " + x).join("")}</div>
+        ${!k.received && days !== null ? html`<div class="small" style=${days >= 10 ? "color:var(--bad)" : "color:var(--muted)"}>Status atualizado há ${days} dia(s)</div>` : null}
+      </div>
+      ${canWrite ? html`<div class="row trk-act">
+        ${!k.received ? html`<select aria-label="Status" value=${k.status} onChange=${(e) => update(o, k, { status: e.target.value }, "Status atualizado.")}>${Object.entries(TRK_STATUS).map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>
+          <button class="btn sm" onClick=${() => update(o, k, { received: true, receivedDate: t, status: "entregue" }, "Pacote marcado como recebido.")}>Recebido</button>`
+        : html`<button class="btn sm" onClick=${() => update(o, k, { received: false, receivedDate: null, status: "em_transito" }, "Recebimento desfeito.")}>Desfazer recebido</button>`}
+      </div>` : null}
+    </div>`)}</div></div></div>` : null}`;
 }
 
 // ---------------- Análises ----------------
