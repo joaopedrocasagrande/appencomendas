@@ -263,8 +263,8 @@ const cx = (...a) => a.filter(Boolean).join(" ");
 const ORDER_STATUS = { cotacao: "Cotação", confirmado: "Confirmado", em_producao: "Em produção", enviado: "Enviado", em_transporte: "Em transporte", recebido_parcial: "Recebido parcialmente", recebido: "Recebido", finalizado: "Finalizado", cancelado: "Cancelado" };
 const ORDER_TONE = { cotacao: "", confirmado: "p-info", em_producao: "p-info", enviado: "p-warn", em_transporte: "p-info", recebido_parcial: "p-warn", recebido: "p-good", finalizado: "p-good", cancelado: "p-bad" };
 const CLOSED = ["recebido", "finalizado", "cancelado"];
-const TRK_STATUS = { aguardando_postagem: "Aguardando postagem", postado: "Postado", em_transito: "Em trânsito", fiscalizacao: "Fiscalização / Alfândega", aguardando_pagamento: "Aguardando pagamento de imposto", saiu_entrega: "Saiu para entrega", entregue: "Entregue", devolvido: "Devolvido", extraviado: "Extraviado" };
-const TRK_TONE = { aguardando_postagem: "", postado: "p-info", em_transito: "p-info", fiscalizacao: "p-warn", aguardando_pagamento: "p-warn", saiu_entrega: "p-info", entregue: "p-good", devolvido: "p-bad", extraviado: "p-bad" };
+const TRK_STATUS = { aguardando_postagem: "Aguardando postagem", postado: "Postado", em_transito: "Em trânsito", fiscalizacao: "Fiscalização / Alfândega", retido: "Pacote retido", aguardando_pagamento: "Aguardando pagamento de imposto", taxacao_paga: "Taxação paga", saiu_entrega: "Saiu para entrega", entregue: "Entregue", devolvido: "Devolvido", extraviado: "Extraviado" };
+const TRK_TONE = { aguardando_postagem: "", postado: "p-info", em_transito: "p-info", fiscalizacao: "p-warn", retido: "p-bad", aguardando_pagamento: "p-warn", taxacao_paga: "p-info", saiu_entrega: "p-info", entregue: "p-good", devolvido: "p-bad", extraviado: "p-bad" };
 const PAY_LABEL = { pendente: "Pagamento pendente", parcial: "Pago parcialmente", pago: "Pago", pago_a_mais: "Pago a mais" };
 const PAY_TONE = { pendente: "p-bad", parcial: "p-warn", pago: "p-good", pago_a_mais: "p-info" };
 const REC_LABEL = { nao_recebido: "Não recebido", parcial: "Recebido parcialmente", completo: "Recebido completo", divergencia: "Recebido com divergência" };
@@ -1698,7 +1698,7 @@ function Precos({ ctx }) {
 // O 17TRACK aceita vários códigos de uma vez (até 40 por consulta): um clique abre todos.
 const TRACK_BATCH = 40;
 const multiTrackLink = (codes) => "https://t.17track.net/pt#nums=" + codes.map((c) => encodeURIComponent(c.trim())).join(",");
-const TRK_PRIORITY = ["aguardando_pagamento", "fiscalizacao", "saiu_entrega", "em_transito", "postado", "aguardando_postagem", "devolvido", "extraviado", "entregue"];
+const TRK_PRIORITY = ["retido", "aguardando_pagamento", "fiscalizacao", "taxacao_paga", "saiu_entrega", "em_transito", "postado", "aguardando_postagem", "devolvido", "extraviado", "entregue"];
 function Rastreios({ ctx }) {
   const { D, byId, api, go, canWrite, notify, today: t } = ctx;
   const [scope, setScope] = useState("caminho");
@@ -1712,7 +1712,7 @@ function Rastreios({ ctx }) {
   }
   const kq = key(q);
   const list = all.filter(({ o, k }) => (scope === "todos" || (scope === "caminho" ? !k.received : k.received))
-      && (!st || (st === "alfandega" ? ["fiscalizacao", "aguardando_pagamento"].includes(k.status) : st === "parados" ? !k.received && k.statusAt && daysBetween(k.statusAt.slice(0, 10), t) >= 10 : k.status === st))
+      && (!st || (st === "alfandega" ? ["fiscalizacao", "retido", "aguardando_pagamento"].includes(k.status) : st === "parados" ? !k.received && k.statusAt && daysBetween(k.statusAt.slice(0, 10), t) >= 10 : k.status === st))
       && (!kq || key([k.code, k.label, o.title, "#" + o.number, byId.suppliers[o.supplierId]?.name, byId.carriers[k.carrierId || o.carrierId]?.name].join(" ")).includes(kq)))
     .sort((a, b) => (TRK_PRIORITY.indexOf(a.k.status) - TRK_PRIORITY.indexOf(b.k.status)) || (a.o.expectedDate || "9999").localeCompare(b.o.expectedDate || "9999") || a.k.code.localeCompare(b.k.code));
   const codes = [...new Set(list.map((x) => x.k.code))];
@@ -1736,7 +1736,7 @@ function Rastreios({ ctx }) {
   return html`<${Head} title="Rastreios" />
     <div class="stats">
       <${Stat} label="A caminho" value=${open.length} onClick=${() => { setScope("caminho"); setSt(""); }} />
-      <${Stat} label="Fiscalização / pagar imposto" value=${count((x) => ["fiscalizacao", "aguardando_pagamento"].includes(x.k.status))} tone=${count((x) => ["fiscalizacao", "aguardando_pagamento"].includes(x.k.status)) ? "warn" : null} onClick=${() => { setScope("caminho"); setSt("alfandega"); }} />
+      <${Stat} label="Fiscalização, retido ou imposto" value=${count((x) => ["fiscalizacao", "retido", "aguardando_pagamento"].includes(x.k.status))} tone=${count((x) => x.k.status === "retido") ? "bad" : count((x) => ["fiscalizacao", "aguardando_pagamento"].includes(x.k.status)) ? "warn" : null} onClick=${() => { setScope("caminho"); setSt("alfandega"); }} />
       <${Stat} label="Parados há 10+ dias" value=${count((x) => x.days !== null && x.days >= 10)} tone=${count((x) => x.days !== null && x.days >= 10) ? "bad" : null} onClick=${() => { setScope("caminho"); setSt("parados"); }} />
       <${Stat} label="Recebidos" value=${all.length - open.length} onClick=${() => { setScope("recebidos"); setSt(""); }} />
     </div>
@@ -1750,7 +1750,7 @@ function Rastreios({ ctx }) {
       <input id="tq" placeholder="Buscar código, pedido, fornecedor ou transportadora" value=${q} onInput=${(e) => setQ(e.target.value)} />
       <div class="row">
         <div class="seg">${[["caminho", "A caminho"], ["recebidos", "Recebidos"], ["todos", "Todos"]].map(([v, l]) => html`<button key=${v} class=${scope === v ? "on" : ""} onClick=${() => setScope(v)}>${l}</button>`)}</div>
-        <select value=${st} onChange=${(e) => setSt(e.target.value)} style="width:auto"><option value="">Todos os status</option><option value="alfandega">Fiscalização ou pagar imposto</option><option value="parados">Parados há 10+ dias</option>${Object.entries(TRK_STATUS).map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>
+        <select value=${st} onChange=${(e) => setSt(e.target.value)} style="width:auto"><option value="">Todos os status</option><option value="alfandega">Fiscalização, retido ou pagar imposto</option><option value="parados">Parados há 10+ dias</option>${Object.entries(TRK_STATUS).map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select>
       </div>
     <//>
     ${list.length ? html`<div class="card"><div class="cb"><div class="list">${list.map(({ o, k, days }) => html`<div class="li trk-li" key=${o.id + k.id}>
@@ -1859,6 +1859,8 @@ function alertsFor(o, t, r, today) {
   if (open && ["enviado", "em_transporte"].includes(o.status) && !(o.trackings || []).length) a.push(["p-warn", "Enviado sem rastreio"]);
   const stale = open ? (o.trackings || []).filter((k) => !k.received && k.statusAt && daysBetween(k.statusAt.slice(0, 10), today) >= 10) : [];
   if (stale.length) a.push(["p-warn", stale.length + " rastreio(s) parado(s) há 10+ dias"]);
+  const held = open ? (o.trackings || []).filter((k) => !k.received && k.status === "retido").length : 0;
+  if (held) a.push(["p-bad", held + " pacote(s) retido(s)"]);
   if (open && t.pending > 0.01 && o.expectedDate && daysBetween(today, o.expectedDate) <= 7) a.push(["p-bad", daysBetween(today, o.expectedDate) < 0 ? "Previsão passou e tem saldo a pagar" : "Chega em até 7 dias com saldo a pagar"]);
   return a;
 }
